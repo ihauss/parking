@@ -15,6 +15,9 @@ private:
     int _id;
     cv::Point _coords[4];   // Les 4 points de la place
     placeState _state;
+    cv::Mat _mask;
+
+    bool hasMovement(const cv::Mat& frame, double thresh);
 
 public:
     // Constructeur
