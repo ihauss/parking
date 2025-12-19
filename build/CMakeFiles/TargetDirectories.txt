@@ -1,3 +1,0 @@
-/home/ismaelhauss/Documents/parking_lot/build/CMakeFiles/main.dir
-/home/ismaelhauss/Documents/parking_lot/build/CMakeFiles/edit_cache.dir
-/home/ismaelhauss/Documents/parking_lot/build/CMakeFiles/rebuild_cache.dir
