@@ -30,24 +30,22 @@ int main(){
     auto t_prev = Clock::now();
     double fps = 0.0;
     const double alpha = 0.1; // smoothing factor
-
     while (true) {
         if (!cap.read(frame)) {
             cout << "Fin de la vidéo." << endl;
             break;
         }
-
         auto t_now = Clock::now();
         double dt = std::chrono::duration<double>(t_now - t_prev).count();
         t_prev = t_now;
 
         double current_fps = 1.0 / dt;
         fps = (fps == 0.0) ? current_fps : alpha * current_fps + (1.0 - alpha) * fps;
-
+        //cout << "1" << endl;
         cout << "\rFPS: " << fixed << setprecision(2) << fps << flush;
 
-        if (!parking.alignToReference(frame, warped))
-            break;
+        //cout << "2" << endl;
+        if (!parking.alignToReference(frame, warped))break;
 
         parking.drawParking(warped);
         imshow("Lecture vidéo", warped);

@@ -13,9 +13,13 @@ private:
     int _numOccupied;
     std::vector<ParkingPlace> _places;
     cv::Mat _reference;
-    cv::Ptr<cv::ORB> _orb;
-    std::vector<cv::KeyPoint> _kr;
-    cv::Mat _dr;
+    
+    cv::Mat _prevGray;
+    std::vector<cv::Point2f> _prevPts;
+    std::vector<cv::Point2f> _refPts;
+    bool _flowInitialized = false;
+
+    void initReference();
 
 
 public:

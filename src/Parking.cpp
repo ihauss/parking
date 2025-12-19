@@ -58,9 +58,28 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
             ++_numOccupied;
     }
     _reference = reference;
-    _orb = cv::ORB::create(1000);
-    _orb->detectAndCompute(_reference, cv::noArray(), _kr, _dr);
+    initReference();
 }
+
+void Parking::initReference()
+{
+    cv::Mat gray;
+    cv::cvtColor(_reference, gray, cv::COLOR_BGR2GRAY);
+
+    // Détecter de bons points à suivre
+    cv::goodFeaturesToTrack(
+        gray,
+        _refPts,
+        500,        // max corners
+        0.01,       // quality
+        10          // min distance
+    );
+
+    _prevGray = gray.clone();
+    _prevPts  = _refPts;
+    _flowInitialized = true;
+}
+
 
 
 size_t Parking::getNumPlace() const {
@@ -95,40 +114,53 @@ void Parking::drawParking(cv::Mat& frame){
     cv::addWeighted(frame, 0.6, overlay, 0.4, 0.0, frame);
 }
 
-bool Parking::alignToReference(const cv::Mat& frame, cv::Mat& warped){
-    std::vector<cv::KeyPoint> kf;
-    cv::Mat df;
+bool Parking::alignToReference(const cv::Mat& frame, cv::Mat& warped)
+{
+    if (!_flowInitialized)
+        return false;
+    cv::Mat gray;
+    cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
 
-    _orb->detectAndCompute(frame, cv::noArray(), kf, df);
+    std::vector<cv::Point2f> currPts;
+    std::vector<uchar> status;
+    std::vector<float> err;
+    // Optical Flow (KLT)
+    cv::calcOpticalFlowPyrLK(
+        _prevGray,
+        gray,
+        _prevPts,
+        currPts,
+        status,
+        err
+    );
 
-    if (df.empty() || _dr.empty()) return false;
-    cv::BFMatcher matcher(cv::NORM_HAMMING);
-    std::vector<std::vector<cv::DMatch>> knn;
-    matcher.knnMatch(df, _dr, knn, 2);
-
-    std::vector<cv::DMatch> good;
-    const float ratio_thresh = 0.75f;
-    for (auto &m : knn) {
-        if (m.size() >= 2 && m[0].distance < ratio_thresh * m[1].distance)
-            good.push_back(m[0]);
+    // Filtrer les points valides
+    std::vector<cv::Point2f> src, dst;
+    for (size_t i = 0; i < status.size(); ++i) {
+        if (status[i]) {
+            src.push_back(currPts[i]);   // frame courante
+            dst.push_back(_refPts[i]);   // référence
+        }
     }
-    if (good.size() < 10) return false;
 
-    std::vector<cv::Point2f> pts_src, pts_dst;
-    for (const auto &m : good) {
-        pts_src.push_back(kf[m.queryIdx].pt); // frame
-        pts_dst.push_back(_kr[m.trainIdx].pt); // reference
-    }
+    if (src.size() < 10)
+        return false;
 
-    std::vector<unsigned char> inliersMask;
-    cv::Mat A = cv::estimateAffinePartial2D(pts_src, pts_dst, inliersMask);
+    std::vector<uchar> inliers;
+    cv::Mat A = cv::estimateAffinePartial2D(
+        src,
+        dst,
+        inliers,
+        cv::RANSAC
+    );
 
-    if (A.empty()) return false;
-
-    int inliers = std::count(inliersMask.begin(), inliersMask.end(), 1);
-    if (inliers < 8) return false;
+    if (A.empty())
+        return false;
 
     cv::warpAffine(frame, warped, A, _reference.size());
+    // Mise à jour pour la frame suivante
+    _prevGray = gray.clone();
+    _prevPts  = currPts;
 
     return true;
 }
