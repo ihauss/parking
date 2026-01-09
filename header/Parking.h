@@ -31,6 +31,7 @@ public:
     void evolve(const cv::Mat& frame);
     void drawParking(cv::Mat& frame);
     bool alignToReference(const cv::Mat& frame, cv::Mat& warped);
+    void addBanner(const cv::Mat& frame, cv::Mat& output, const double& fps);
 };
 
 #endif

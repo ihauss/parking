@@ -41,14 +41,18 @@ int main(){
 
         double current_fps = 1.0 / dt;
         fps = (fps == 0.0) ? current_fps : alpha * current_fps + (1.0 - alpha) * fps;
-        //cout << "1" << endl;
-        cout << "\rFPS: " << fixed << setprecision(2) << fps << flush;
+        
+        //cout << "\rFPS: " << fixed << setprecision(2) << fps << flush;
 
-        //cout << "2" << endl;
         if (!parking.alignToReference(frame, warped))break;
 
+        parking.evolve(warped);
         parking.drawParking(warped);
-        imshow("Lecture vidéo", warped);
+
+        Mat output;
+        parking.addBanner(warped, output, fps);
+
+        imshow("Lecture vidéo", output);
 
         if (waitKey(1) == 27)
             break;

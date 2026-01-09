@@ -2,6 +2,7 @@
 #define PARKING_PLACE_H
 
 #include <opencv2/opencv.hpp>
+#include <future>
 
 enum placeState {
     FREE,
@@ -15,9 +16,16 @@ private:
     int _id;
     cv::Point _coords[4];   // Les 4 points de la place
     placeState _state;
+    std::future<placeState> _futureState;  
     cv::Mat _mask;
+    cv::Ptr<cv::BackgroundSubtractorKNN> _knn;
+    bool _coordAdjust = false;
+    unsigned int _warmUp = 50;
 
+    bool adjustCoords(const cv::Size& frameSize);
     bool hasMovement(const cv::Mat& frame, double thresh);
+    void initMask();
+    placeState evalState(const cv::Mat& frame);
 
 public:
     // Constructeur

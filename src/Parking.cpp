@@ -48,7 +48,7 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
 
         // créer la place (appel au constructeur qui doit copier le tableau)
         ParkingPlace place(coords_arr, id_counter);
-        _places.push_back(place);
+        _places.push_back(std::move(place));
     }
 
     // Initialiser le nombre de places occupées
@@ -114,8 +114,7 @@ void Parking::drawParking(cv::Mat& frame){
     cv::addWeighted(frame, 0.6, overlay, 0.4, 0.0, frame);
 }
 
-bool Parking::alignToReference(const cv::Mat& frame, cv::Mat& warped)
-{
+bool Parking::alignToReference(const cv::Mat& frame, cv::Mat& warped){
     if (!_flowInitialized)
         return false;
     cv::Mat gray;
@@ -163,4 +162,66 @@ bool Parking::alignToReference(const cv::Mat& frame, cv::Mat& warped)
     _prevPts  = currPts;
 
     return true;
+}
+
+void Parking::addBanner(const cv::Mat& frame, cv::Mat& output, const double& fps){
+    int W = frame.cols;
+    int H = frame.rows;
+
+    int bannerH = static_cast<int>(0.12 * H); // 12% de la hauteur
+
+    cv::Mat banner(
+        bannerH,
+        W,
+        frame.type(),
+        cv::Scalar(30, 30, 30) // gris foncé
+    );
+
+    int free = getNumPlace()-getNumOccupied();
+
+    std::string fpsText = "FPS: " + std::to_string(static_cast<int>(fps));
+    std::string ratioText = "Free : " +
+                            std::to_string(free) + "/" +
+                            std::to_string(getNumPlace());
+
+    int font = cv::FONT_HERSHEY_SIMPLEX;
+    double fontScale = bannerH / 60.0;
+    int thickness = 2;
+    cv::Scalar color(255, 255, 255); // blanc
+
+    int baseline = 0;
+    cv::Size textSize = cv::getTextSize(
+        ratioText,
+        font,
+        fontScale,
+        thickness,
+        &baseline
+    );
+
+    int x = W - textSize.width - 20;
+    int y = (bannerH - (textSize.height + baseline)) / 2 + textSize.height;
+
+    cv::putText(
+        banner,
+        fpsText,
+        cv::Point(20, y),
+        font,
+        fontScale,
+        color,
+        thickness,
+        cv::LINE_AA
+    );
+
+    cv::putText(
+        banner,
+        ratioText,
+        cv::Point(x, y),
+        font,
+        fontScale,
+        color,
+        thickness,
+        cv::LINE_AA
+    );
+
+    cv::vconcat(banner, frame, output);
 }
