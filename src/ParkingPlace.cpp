@@ -64,6 +64,7 @@ placeState ParkingPlace::evalState(const cv::Mat& frame){
 
     //std::cout << varianceY << std::endl;
     //model(fgMask)
+    _warmUp = 10;
     if(varianceY > 1500)return OCCUPIED;
 
     return FREE;
@@ -121,6 +122,9 @@ bool ParkingPlace::hasMovement(const cv::Mat& frame, double thresh){
     _knn->apply(roi, fgMask);
 
     cv::bitwise_and(fgMask, _mask, fgMask);
+
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::morphologyEx(fgMask, fgMask, cv::MORPH_OPEN, kernel);
 
     double motionRatio = cv::countNonZero(fgMask) / (double)cv::countNonZero(_mask);
 

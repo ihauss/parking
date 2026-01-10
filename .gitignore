@@ -1,5 +1,6 @@
 .vscode/
 build/
 dataset/
+output/
 dataset.zip
 dataset_one_class.zip

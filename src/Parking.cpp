@@ -224,4 +224,6 @@ void Parking::addBanner(const cv::Mat& frame, cv::Mat& output, const double& fps
     );
 
     cv::vconcat(banner, frame, output);
+    cv::resize(output, output, cv::Size(frame.cols ,frame.rows), 0, 0, cv::INTER_LINEAR);
+
 }
