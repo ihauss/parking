@@ -15,6 +15,7 @@ add_executable(main
     main.cpp
     src/Parking.cpp
     src/ParkingPlace.cpp
+    src/utils.cpp
 )
 
 target_link_libraries(main
