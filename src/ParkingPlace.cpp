@@ -10,7 +10,7 @@ const std::array<cv::Scalar, 4> COLORS = {
 ParkingPlace::ParkingPlace(const cv::Point coords[4], int id)
     : _id(id), _state(FREE)
 {
-    // Copier proprement les 4 points
+    // Copy 4 points
     for (int i = 0; i < 4; i++) {
         _coords[i] = coords[i];
     }
