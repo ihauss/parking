@@ -44,10 +44,9 @@ int getCapAndWriter(VideoCapture& cap, VideoWriter& writer, const string& videoP
     }
     if(!cap.read(frame))return-1;
     if (config.record) {
-        int fourcc = cv::VideoWriter::fourcc('a','v','c','1');  // ou 'H','2','6','4'
+        int fourcc = cv::VideoWriter::fourcc('a','v','c','1');
 
-        //int fourcc = cv::VideoWriter::fourcc('m','p','4','v');
-        double fpsVid = 25.0; // ou récupéré depuis la caméra
+        double fpsVid = 25.0;
         
         cv::Size frameSize(frame.cols, frame.rows);
 
