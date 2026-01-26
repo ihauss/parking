@@ -37,17 +37,6 @@ private:
     unsigned int _warmUp = 50;
 
     /**
-     * @brief Clamps parking coordinates to remain within frame boundaries.
-     *
-     * If coordinates exceed the frame size, they are adjusted and the
-     * internal mask is recomputed.
-     *
-     * @param frameSize Size of the current video frame.
-     * @return True if any coordinate was modified.
-     */
-    bool adjustCoords(const cv::Size& frameSize);
-
-    /**
      * @brief Detects motion inside the parking place region.
      *
      * Motion detection is performed using a KNN background subtractor
@@ -90,6 +79,17 @@ public:
      * @param id Unique identifier of the parking place.
      */
     ParkingPlace(const cv::Point coords[4], int id = 0);
+
+    /**
+     * @brief Clamps parking coordinates to remain within frame boundaries.
+     *
+     * If coordinates exceed the frame size, they are adjusted and the
+     * internal mask is recomputed.
+     *
+     * @param frameSize Size of the current video frame.
+     * @return True if any coordinate was modified.
+     */
+    bool adjustCoords(const cv::Size& frameSize);
 
     /**
      * @brief Returns the current state of the parking place.

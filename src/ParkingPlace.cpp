@@ -61,9 +61,7 @@ placeState ParkingPlace::evalState(const cv::Mat& frame){
     cv::Scalar mean, stddev;
     cv::meanStdDev(Y, mean, stddev);
     double varianceY = stddev[0] * stddev[0];
-
-    //std::cout << varianceY << std::endl;
-    //model(fgMask)
+    
     _warmUp = 10;
     if(varianceY > 1500)return OCCUPIED;
 

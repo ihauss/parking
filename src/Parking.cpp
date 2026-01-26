@@ -6,23 +6,23 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
     // Open JSON configuration file
     std::ifstream file(jsonPath);
     if (!file.is_open()) {
-        std::cerr << "Failed to open JSON file: " << jsonPath << std::endl;
-        return;
+        throw std::runtime_error("Failed to open JSON file: " + jsonPath);
     }
+
 
     // Parse JSON content
     nlohmann::json j;
     try {
         file >> j;
     } catch (const std::exception& e) {
-        std::cerr << "Failed to parse JSON: " << e.what() << std::endl;
-        return;
+        throw std::runtime_error(
+            std::string("Failed to parse JSON: ") + e.what()
+        );
     }
 
     // Validate JSON structure
     if (!j.contains("parking_places") || !j["parking_places"].is_array()) {
-        std::cerr << "JSON format error: missing 'parking_places' array" << std::endl;
-        return;
+        throw std::runtime_error("Invalid JSON format: missing parking_places");
     }
 
     int id_counter = 0;
