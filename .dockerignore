@@ -1,0 +1,15 @@
+# Build artifacts
+build/
+cmake-build-*/
+
+# CMake cache
+CMakeCache.txt
+CMakeFiles/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore

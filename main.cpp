@@ -43,7 +43,7 @@ int main(int argc, char** argv){
     Parking parking("files/coords.json", imread("files/reference.jpg"));
 
     // Create display window
-    namedWindow("Parking view", WINDOW_NORMAL);
+    if (!config.headless)namedWindow("Parking view", WINDOW_NORMAL);
 
     // Initialize video capture and optional recording
     int capAndWriter = getCapAndWriter(cap, writer, "files/video1.mp4", config);

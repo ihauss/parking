@@ -26,7 +26,7 @@ TEST(getCoords, CorrectInitialCoords) {
     };
 
     ParkingPlace pp(coords, 0);
-    for(int i; i < 4; i++){
+    for(int i = 0; i < 4; i++){
         EXPECT_EQ(pp.getCoords()[i].x, coords[i].x);
         EXPECT_EQ(pp.getCoords()[i].y, coords[i].y);
     }
@@ -44,7 +44,7 @@ TEST(adjustCoords, NoClamp) {
     cv::Size s(50, 50);
     ParkingPlace pp(coords, 0);
     pp.adjustCoords(s);
-    for(int i; i < 4; i++){
+    for(int i = 0; i < 4; i++){
         EXPECT_EQ(pp.getCoords()[i].x, coords[i].x);
         EXPECT_EQ(pp.getCoords()[i].y, coords[i].y);
     }
