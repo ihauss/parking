@@ -38,11 +38,14 @@ WORKDIR /app
 # ---- Copy executable ----
 COPY --from=build /app/build/smart_parking /usr/local/bin/smart_parking
 
+# ---- Copy tests ----
+COPY --from=build /app/build/tests/run_tests /usr/local/bin/run_tests
+
 # ---- Copy runtime assets ----
 COPY files /app/files
 
-# ---- Copy output assets ----
-COPY output /app/output
+# ---- Copy tests assets ----
+COPY tests /app/tests/
 
 ENTRYPOINT ["smart_parking"]
 CMD []
