@@ -37,7 +37,7 @@ int main(int argc, char** argv){
 
     VideoCapture cap;
     VideoWriter writer;
-    Mat frame, output;
+    Mat frame, output, display;
 
     // Initialize the parking detection system
     Parking parking("files/coords.json", imread("files/reference.jpg"));
@@ -71,10 +71,10 @@ int main(int argc, char** argv){
         parking.drawParking(output);
 
         // Add informational overlay (FPS, statistics, etc.)
-        parking.addBanner(output, output, fps);
+        parking.addBanner(output, display, fps);
 
         // Display and/or record the processed frame
-        if(!recordAndDisplay(writer, output, config))break;
+        if(!recordAndDisplay(writer, display, config))break;
     }
 
     cout << endl;
