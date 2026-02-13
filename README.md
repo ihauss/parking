@@ -1,15 +1,27 @@
 # Smart Parking
-## Overview
-## Demo
-## Installation
-## Usage
+### A constrained computer vision system for parking occupancy estimation
+## 1. Problem Statement
+Monitoring parking occupancy seems trivial when high-resolution cameras, stable viewpoints and GPU-powered inference are available.
+
+In practice, many real-world deployments rely on low-cost hardware, fixed overhead cameras subject to slight motion, and limited computational resources.
+
+The challenge addressed in this project is to reliably estimate parking occupancy from a semi-stable top-down view, under strict compute constraints (CPU-only, no GPU), while maintaining robustness to illumination changes and minor camera displacement.
+## 2. Scope and Constraints
+## 3. System Overview
+## 4. Architecture
+## 5. Technical Choices
+## 6. Demo and Visualization
+## 7. Performance
+## 8. Limitations
+## 9. Future Work
+## 10. Installation and usage
 
 The application can be built and executed entirely through Docker.
 Command-line arguments are forwarded directly to the executable, preserving the standard `argc / argv` behavior.
 
 ---
 
-### Command-line arguments
+#### Command-line arguments
 
 | Argument | Description |
 |--------|-------------|
@@ -19,20 +31,20 @@ Command-line arguments are forwarded directly to the executable, preserving the 
 
 ---
 
-### Build the Docker image
+#### Build the Docker image
 
 ```bash
 docker build -t smart_parking .
 ```
 
-### Run the application
+#### Run the application
 The app launch mode with docker need to be headless. If you want to monitor the result you can record or give docker access to visual environement.
 
 ```bash
 docker run --rm smart_parking --headless
 ```
 
-### Run the application (Visual Linux)
+#### Run the application (Visual Linux)
 ```bash
 xhost -local:docker
 ```
@@ -44,7 +56,7 @@ docker run --rm \
   smart_parking
 ```
 
-### Run with command-line arguments
+#### Run with command-line arguments
 
 If you want to record the result you need to mount the output directory.
 
@@ -63,11 +75,4 @@ To manually run tests inside a development container, you can use the build stag
 docker run --rm --entrypoint run_tests smart_parking
 ```
 
-## Performance
-## Architecture
-## Technical Choices
-## Testing
-## Challenges
-## Limitations
-## Future Work
-## Conclusion
+## 11. Conclusion
