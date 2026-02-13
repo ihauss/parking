@@ -46,7 +46,7 @@ docker run --rm smart_parking --headless
 
 #### Run the application (Visual Linux)
 ```bash
-xhost -local:docker
+xhost +local:docker
 ```
 
 ```bash
