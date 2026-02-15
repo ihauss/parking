@@ -1,5 +1,4 @@
-#ifndef PARKING_H
-#define PARKING_H
+#pragma once
 
 #include <opencv2/opencv.hpp>
 #include <nlohmann/json.hpp>
@@ -109,4 +108,4 @@ public:
     void addBanner(const cv::Mat& frame, cv::Mat& output, const double& fps);
 };
 
-#endif
+

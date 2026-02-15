@@ -1,11 +1,9 @@
-#ifndef PARKING_PLACE_H
-#define PARKING_PLACE_H
+#pragma once
 
 #include <opencv2/opencv.hpp>
 #include <future>
 #include "smart_parking/LightVision.h"
 #include "smart_parking/StateManager.h"
-#include "smart_parking/HeavyEstimator.h"
 
 /**
  * @class ParkingPlace
@@ -86,5 +84,3 @@ public:
      */
     void drawPlace(cv::Mat& frame, cv::Mat& overlay);
 };
-
-#endif

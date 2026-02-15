@@ -1,5 +1,4 @@
-#ifndef HEAVY_ESTIMATOR_H
-#define HEAVY_ESTIMATOR_H
+#pragma once
 
 #include <opencv2/opencv.hpp>
 
@@ -25,5 +24,3 @@ public:
 
     bool operator()(cv::Mat& frame, cv::Point coords[4]);
 };
-
-#endif

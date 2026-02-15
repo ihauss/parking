@@ -1,9 +1,9 @@
-#ifndef STATE_MANAGER_H
-#define STATE_MANAGER_H
+#pragma once
 
 #include <opencv2/opencv.hpp>
 #include <future>
 #include "smart_parking/HeavyEstimator.h"
+#include "smart_parking/LightVisionData.h"
 
 enum placeState {
     INIT_STATE,
@@ -24,7 +24,5 @@ public:
 
     placeState getState() const;
 
-    void operator()(bool& motion, cv::Mat& frame, cv::Point coords[4]);
+    void operator()(LightVisionData& data, cv::Mat& frame, cv::Point coords[4]);
 };
-
-#endif

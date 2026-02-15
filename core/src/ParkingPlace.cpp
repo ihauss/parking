@@ -49,8 +49,8 @@ bool ParkingPlace::adjustCoords(cv::Size& frameSize)
 void ParkingPlace::changeState(cv::Mat& frame) {
     cv::Size frameSize = frame.size();
     if(!_coordAdjust)adjustCoords(frameSize);
-    bool motion = _lightVision.hasMovement(frame, _coords, 0.25);
-    _stateManager(motion, frame, _coords);
+    struct LightVisionData data = _lightVision(frame, _coords, 0.25);
+    _stateManager(data, frame, _coords);
 }
 
 void ParkingPlace::drawPlace(cv::Mat& frame, cv::Mat& overlay){

@@ -1,5 +1,4 @@
-#ifndef PARKING_UTILS_H
-#define PARKING_UTILS_H
+#pragma once
 
 /**
  * @file utils.h
@@ -85,5 +84,3 @@ int getCapAndWriter(VideoCapture& cap, VideoWriter& writer, const string& videoP
  * @return False if the user requested exit, true otherwise.
  */
 bool recordAndDisplay(VideoWriter& writer, Mat& frame, AppConfig& config);
-
-#endif

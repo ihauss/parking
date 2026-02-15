@@ -38,3 +38,11 @@ bool LightVision::hasMovement(const cv::Mat& frame, cv::Point coords[4], double 
 
     return motionRatio > thresh;
 }
+
+LightVisionData LightVision::operator()(const cv::Mat& frame, cv::Point coords[4], double thresh){
+    bool motion = hasMovement(frame, coords, thresh);
+    std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
+
+    struct LightVisionData data = {motion, timestamp};
+    return data;
+}

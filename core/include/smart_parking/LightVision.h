@@ -1,7 +1,7 @@
-#ifndef LIGHT_VISION_H
-#define LIGHT_VISION_H
+#pragma once
 
 #include <opencv2/opencv.hpp>
+#include "smart_parking/LightVisionData.h"
 
 class LightVision {
 private:
@@ -31,6 +31,6 @@ public:
      * @return True if motion exceeds the given threshold.
      */
     bool hasMovement(const cv::Mat& frame, cv::Point coords[4], double thresh);
-};
 
-#endif
+    LightVisionData operator()(const cv::Mat& frame, cv::Point coords[4], double thresh);
+};

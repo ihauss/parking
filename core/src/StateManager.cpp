@@ -8,7 +8,8 @@ placeState StateManager::getState() const{
     return _currentState;
 }
 
-void StateManager::operator()(bool& motion, cv::Mat& frame, cv::Point coords[4]){
+void StateManager::operator()(LightVisionData& data, cv::Mat& frame, cv::Point coords[4]){
+    bool motion = data.hasMovement;
     if (_occupancyResult.valid() && _occupancyResult.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             if(_occupancyResult.get())_currentState = OCCUPIED;
             else _currentState = FREE;
