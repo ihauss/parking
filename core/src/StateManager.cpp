@@ -9,19 +9,15 @@ placeState StateManager::getState() const{
 }
 
 void StateManager::operator()(bool& motion, cv::Mat& frame, cv::Point coords[4]){
-    /*if (_occupancyResult.valid() && _occupancyResult.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (_occupancyResult.valid() && _occupancyResult.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             if(_occupancyResult.get())_currentState = OCCUPIED;
             else _currentState = FREE;
-    }*/
-
-    bool occupancyResult;
+    }
 
     switch (_currentState)
     {
     case INIT_STATE:
-        occupancyResult = _estimator(frame, coords);
-        if(!occupancyResult)_currentState = FREE;
-        else if(occupancyResult)_currentState = OCCUPIED;
+        _occupancyResult = std::async(std::launch::async, [this, frame, coords]() mutable {return _estimator(frame, coords);});
         break;
 
     case FREE:
@@ -33,11 +29,8 @@ void StateManager::operator()(bool& motion, cv::Mat& frame, cv::Point coords[4])
         break;
 
     default:
-        //if(!motion)_occupancyResult = std::async(std::launch::async, [this, frame]() {return _estimator(frame);});
-        std::cout << motion << std::endl;
-        occupancyResult = _estimator(frame, coords);
-        if(!motion && !occupancyResult)_currentState = FREE;
-        else if(!motion && occupancyResult)_currentState = OCCUPIED;
+        if(!motion)_occupancyResult = std::async(std::launch::async, [this, frame, coords]() mutable {return _estimator(frame, coords);});
+        
         break;
     }
 }
