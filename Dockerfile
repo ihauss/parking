@@ -5,6 +5,7 @@ FROM debian:bookworm AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# ---- Install build dependencies ----
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -14,10 +15,19 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Copy entire project
 COPY . .
 
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+# ---- Configure and build ----
+RUN cmake -S . -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/opencv4 \
  && cmake --build build -j$(nproc)
+
+# ---- Run tests (fail build if tests fail) ----
+RUN ctest --test-dir build --output-on-failure
+
 
 # =========================
 # Runtime stage
@@ -26,26 +36,21 @@ FROM debian:bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# ---- Install runtime dependencies ----
+# ---- Install only runtime dependencies (lighter than -dev) ----
 RUN apt-get update && apt-get install -y \
     libopencv-dev \
     nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- Set workdir ----
+
 WORKDIR /app
 
-# ---- Copy executable ----
-COPY --from=build /app/build/smart_parking /usr/local/bin/smart_parking
-
-# ---- Copy tests ----
-COPY --from=build /app/build/tests/run_tests /usr/local/bin/run_tests
+# ---- Copy embedded executable ----
+COPY --from=build /app/build/embedded/smart_parking_embedded /usr/local/bin/smart_parking
 
 # ---- Copy runtime assets ----
 COPY files /app/files
 
-# ---- Copy tests assets ----
-COPY tests /app/tests/
-
+# ---- Default entrypoint ----
 ENTRYPOINT ["smart_parking"]
 CMD []

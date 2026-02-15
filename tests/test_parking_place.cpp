@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "ParkingPlace.h"
+#include "smart_parking/ParkingPlace.h"
 #include <opencv2/opencv.hpp>
 
 // Test if the initial state is correct

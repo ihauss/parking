@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "utils.h"
+#include "smart_parking/utils.h"
 #include <opencv2/opencv.hpp>
 
 // Test no args
