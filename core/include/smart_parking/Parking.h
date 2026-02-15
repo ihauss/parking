@@ -72,7 +72,7 @@ public:
      *
      * @param frame Current video frame.
      */
-    void evolve(const cv::Mat& frame);
+    void evolve(cv::Mat& frame);
 
     /**
      * @brief Updates the occupancy state of all parking places.

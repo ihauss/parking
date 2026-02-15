@@ -100,7 +100,7 @@ int Parking::getNumOccupied() const {
     return _numOccupied;
 }
 
-void Parking::evolve(const cv::Mat& frame) {
+void Parking::evolve(cv::Mat& frame) {
     int newCount = 0;
 
     for (auto& place : _places) {
