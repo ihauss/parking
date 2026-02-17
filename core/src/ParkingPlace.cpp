@@ -1,14 +1,9 @@
 #include "smart_parking/ParkingPlace.h"
 
-const std::array<cv::Scalar, 4> COLORS = {
-    cv::Scalar(0, 255, 0),  
-    cv::Scalar(0, 127, 255), 
-    cv::Scalar(0, 0, 255),   
-    cv::Scalar(0, 255, 255)
-};
+using namespace std::chrono_literals;
 
-ParkingPlace::ParkingPlace(const cv::Point coords[4], int id)
-    : _id(id)
+ParkingPlace::ParkingPlace(const std::array<cv::Point, 4> coords, int id)
+    : _id(id), _currentState(PlaceState::INIT_STATE)
 {
     // Copy 4 points
     for (int i = 0; i < 4; i++) {
@@ -16,11 +11,46 @@ ParkingPlace::ParkingPlace(const cv::Point coords[4], int id)
     }
 }
 
-placeState ParkingPlace::getState() const {
-    return _stateManager.getState();
+PlaceState ParkingPlace::getState() const{
+    return _currentState;
 }
 
-const cv::Point* ParkingPlace::getCoords() const {
+bool ParkingPlace::isRecent(std::chrono::steady_clock::time_point timestamp, std::chrono::milliseconds coolDownTime){
+    bool recent = timestamp - _lastEstimationTime < coolDownTime;
+    return recent;
+}
+
+bool ParkingPlace::update(LightVisionData& data, std::optional<bool> info){
+    if(info.has_value()){
+        if(*info)_currentState = PlaceState::OCCUPIED;
+        else _currentState = PlaceState::FREE;
+        _lastEstimationTime = data.timestamp;
+    }
+
+    if(isRecent(data.timestamp, 500ms))return false;
+
+    switch (_currentState)
+    {
+    case PlaceState::INIT_STATE:
+        _lastEstimationTime = data.timestamp;
+        return true;
+
+    case PlaceState::FREE:
+        if(data.hasMovement)_currentState = PlaceState::TRANSITION_IN;
+        break;
+
+    case PlaceState::OCCUPIED:
+        if(data.hasMovement)_currentState = PlaceState::TRANSITION_OUT;
+        break;
+
+    default:
+        if(!data.hasMovement)return true;
+        break;
+    }
+    return false;
+}
+
+const std::array<cv::Point, 4> ParkingPlace::getCoords() const {
     return _coords;
 }
 
@@ -47,17 +77,19 @@ bool ParkingPlace::adjustCoords(cv::Size& frameSize)
 }
 
 void ParkingPlace::changeState(cv::Mat& frame) {
+    if (_occupancyResultAsc.valid() && _occupancyResultAsc.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            _occupancyResult = _occupancyResultAsc.get();
+    }
+
     cv::Size frameSize = frame.size();
     if(!_coordAdjust)adjustCoords(frameSize);
     struct LightVisionData data = _lightVision(frame, _coords, 0.25);
-    _stateManager(data, frame, _coords);
-}
-
-void ParkingPlace::drawPlace(cv::Mat& frame, cv::Mat& overlay){
-    std::vector<std::vector<cv::Point>> contours;
-    contours.emplace_back(_coords, _coords + 4);
-    cv::Scalar color = COLORS[_stateManager.getState()-1];
-    int thickness = 3;
-    cv::polylines(frame, contours, true, color, thickness, cv::LINE_AA);
-    cv::fillPoly(overlay, contours, color, cv::LINE_AA);
+    bool needHeavyEstimation = update(data, _occupancyResult);
+    if(needHeavyEstimation){
+        _occupancyResultAsc = std::async(std::launch::async, 
+            [this, frame]() mutable 
+            {return _estimator(frame, _coords);}
+        );
+    }
+    _occupancyResult.reset();
 }

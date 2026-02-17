@@ -4,8 +4,8 @@ LightVision::LightVision(){
     _knn = cv::createBackgroundSubtractorKNN(_warmUp);
 }
 
-void LightVision::initMask(cv::Point coords[4]){
-    cv::Rect bbox = cv::boundingRect(std::vector<cv::Point>(coords, coords + 4));
+void LightVision::initMask(const std::array<cv::Point, 4>& coords){
+    cv::Rect bbox = cv::boundingRect(std::vector<cv::Point>(coords.begin(), coords.end()));
    
     std::vector<cv::Point> polyLocal;
     for (int i = 0; i < 4; ++i) {
@@ -16,9 +16,9 @@ void LightVision::initMask(cv::Point coords[4]){
     cv::fillPoly(_mask, std::vector<std::vector<cv::Point>>{polyLocal}, 255);
 }
 
-bool LightVision::hasMovement(const cv::Mat& frame, cv::Point coords[4], double thresh){
+bool LightVision::computeMotionSignal(const cv::Mat& frame, const std::array<cv::Point, 4>& coords, double thresh){
     if(!hasMask)initMask(coords);
-    cv::Rect bbox = cv::boundingRect(std::vector<cv::Point>(coords, coords + 4));
+    cv::Rect bbox = cv::boundingRect(std::vector<cv::Point>(coords.begin(), coords.end()));
     cv::Mat roi = frame(bbox);
 
     cv::Mat fgMask;
@@ -39,8 +39,8 @@ bool LightVision::hasMovement(const cv::Mat& frame, cv::Point coords[4], double 
     return motionRatio > thresh;
 }
 
-LightVisionData LightVision::operator()(const cv::Mat& frame, cv::Point coords[4], double thresh){
-    bool motion = hasMovement(frame, coords, thresh);
+LightVisionData LightVision::operator()(const cv::Mat& frame, const std::array<cv::Point, 4>& coords, double thresh){
+    bool motion = computeMotionSignal(frame, coords, thresh);
     std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 
     struct LightVisionData data = {motion, timestamp};

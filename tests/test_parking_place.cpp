@@ -5,7 +5,7 @@
 
 // Test if the initial state is correct
 TEST(getState, CorrectInitialState) {
-    cv::Point coords[4] = {
+    std::array<cv::Point, 4> coords = {
         cv::Point(0, 0),
         cv::Point(0, 0),
         cv::Point(0, 0),
@@ -13,12 +13,12 @@ TEST(getState, CorrectInitialState) {
     };
     
     ParkingPlace pp(coords, 0);
-    EXPECT_EQ(pp.getState(), FREE);
+    EXPECT_EQ(pp.getState(), PlaceState::FREE);
 }
 
 // Test if the initial coords are corrects
 TEST(getCoords, CorrectInitialCoords) {
-    cv::Point coords[4] = {
+    std::array<cv::Point, 4> coords = {
         cv::Point(0, 0),
         cv::Point(0, 0),
         cv::Point(0, 0),
@@ -34,7 +34,7 @@ TEST(getCoords, CorrectInitialCoords) {
 
 // Test the case where the coordinates are all in the image
 TEST(adjustCoords, NoClamp) {
-    cv::Point coords[4] = {
+    std::array<cv::Point, 4> coords = {
         cv::Point(0, 0),
         cv::Point(0, 0),
         cv::Point(0, 0),
@@ -52,7 +52,7 @@ TEST(adjustCoords, NoClamp) {
 
 // Test the case where the top coordinates are off grid
 TEST(adjustCoords, TopClamp) {
-    cv::Point coords[4] = {
+    std::array<cv::Point, 4> coords = {
         cv::Point(-5, 0),
         cv::Point(-5, 0),
         cv::Point(0, 0),
@@ -68,7 +68,7 @@ TEST(adjustCoords, TopClamp) {
 
 // Test the case where the bottom coordinates are off grid
 TEST(adjustCoords, BottomClamp) {
-    cv::Point coords[4] = {
+    std::array<cv::Point, 4> coords = {
         cv::Point(0, 0),
         cv::Point(0, 0),
         cv::Point(55, 0),
@@ -84,7 +84,7 @@ TEST(adjustCoords, BottomClamp) {
 
 // Test the case where the left coordinates are off grid
 TEST(adjustCoords, LeftClamp) {
-    cv::Point coords[4] = {
+    std::array<cv::Point, 4> coords = {
         cv::Point(0, -5),
         cv::Point(0, 0),
         cv::Point(0, 0),
@@ -100,7 +100,7 @@ TEST(adjustCoords, LeftClamp) {
 
 // Test the case where the right coordinates are off grid
 TEST(adjustCoords, RightClamp) {
-    cv::Point coords[4] = {
+    std::array<cv::Point, 4> coords = {
         cv::Point(0, 0),
         cv::Point(0, 55),
         cv::Point(0, 55),

@@ -37,7 +37,7 @@ int main(int argc, char** argv){
 
     VideoCapture cap;
     VideoWriter writer;
-    Mat frame, output, display;
+    Mat frame;
 
     // Initialize the parking detection system
     Parking parking("files/coords.json", imread("files/reference.jpg"));
@@ -46,11 +46,9 @@ int main(int argc, char** argv){
     if (!config.headless)namedWindow("Parking view", WINDOW_NORMAL);
 
     // Initialize video capture and optional recording
-    int capAndWriter = getCapAndWriter(cap, writer, "files/video1.mp4", config);
-    if (capAndWriter!=1) return -1;
+    InitStatus capAndWriter = getCapAndWriter(cap, writer, "files/video1.mp4", config);
+    if (capAndWriter!=InitStatus::Success) return -1;
 
-    auto t_prev = Clock::now();
-    double fps = 0.0;
     while (true) {
         // Read next frame from the video stream
         if (!cap.read(frame)) {
@@ -58,23 +56,11 @@ int main(int argc, char** argv){
             break;
         }
 
-        // Align current frame with the reference image
-        if (!parking.alignToReference(frame, output))break;
-
         // Update parking occupancy state
-        parking.evolve(output);
-
-        // Draw parking slots and occupancy status
-        parking.drawParking(output);
-
-        // Add informational overlay (FPS, statistics, etc.)
-        parking.addBanner(output, display, fps);
-
+        parking.evolve(frame);
+        
         // Display and/or record the processed frame
-        if(!recordAndDisplay(writer, display, config))break;
-
-        // Update FPS estimation
-        getFPS(fps, t_prev, 0.1);
+        if(!recordAndDisplay(writer, frame, config))break;
     }
 
     cout << endl;

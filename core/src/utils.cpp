@@ -28,38 +28,23 @@ AppConfig parseArgs(int argc, char** argv) {
     return config;
 }
 
-void getFPS(double& fps, Clock::time_point& t_prev, double alpha){
-    // Measure elapsed time since last frame
-    auto t_now = Clock::now();
-    double dt = std::chrono::duration<double>(t_now - t_prev).count();
-    t_prev = t_now;
-
-    // Instantaneous FPS
-    double current_fps = 1.0 / dt;
-
-    // Exponential moving average for smoother FPS
-    fps = (fps == 0.0)
-        ? current_fps
-        : alpha * current_fps + (1.0 - alpha) * fps;
-}
-
-int getCapAndWriter(VideoCapture& cap,
-                    VideoWriter& writer,
-                    const string& videoPath,
-                    AppConfig& config)
+InitStatus getCapAndWriter(cv::VideoCapture& cap,
+                    cv::VideoWriter& writer,
+                    const std::string& videoPath,
+                    const AppConfig& config)
 {
-    Mat frame;
+    cv::Mat frame;
 
     // Open input video
     cap.open(videoPath);
     if (!cap.isOpened()) {
-        cerr << "Error : impossible to open video !" << endl;
-        return 0;
+        std::cerr << "Error : impossible to open video !" << std::endl;
+        return InitStatus::VideoOpenFailed;
     }
 
     // Read first frame to get video properties
     if (!cap.read(frame))
-        return -1;
+        return InitStatus::FirstFrameReadFailed;
 
     // Initialize video writer if recording is enabled
     if (config.record) {
@@ -67,7 +52,7 @@ int getCapAndWriter(VideoCapture& cap,
         double fpsVid = 25.0;
 
         cv::Size frameSize(frame.cols, frame.rows);
-        string outputPath = "output/" + config.outputPath;
+        std::string outputPath = "output/" + config.outputPath;
 
         namespace fs = std::filesystem;
         const std::string outputDir = "output";
@@ -83,16 +68,16 @@ int getCapAndWriter(VideoCapture& cap,
 
         if (!writer.isOpened()) {
             std::cerr << "Failed to open video writer" << std::endl;
-            return -2;
+            return InitStatus::WriterOpenFailed;
         }
     }
 
-    return 1;
+    return InitStatus::Success;
 }
 
-bool recordAndDisplay(VideoWriter& writer,
-                      Mat& frame,
-                      AppConfig& config)
+bool recordAndDisplay(cv::VideoWriter& writer,
+                      cv::Mat& frame,
+                      const AppConfig& config)
 {
     // Write frame to disk if recording
     if (config.record) {
@@ -101,10 +86,10 @@ bool recordAndDisplay(VideoWriter& writer,
 
     // Display frame unless running headless
     if (!config.headless) {
-        imshow("Parking view", frame);
+        cv::imshow("Parking view", frame);
 
         // Exit on ESC key
-        if (waitKey(1) == 27)
+        if (cv::waitKey(1) == 27)
             return false;
     }
 

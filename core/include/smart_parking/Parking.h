@@ -5,107 +5,106 @@
 #include <vector>
 #include <string>
 #include <fstream>
+
 #include "ParkingPlace.h"
+#include "smart_parking/Aligner.h"
+#include "smart_parking/RenderPlace.h"
+#include "smart_parking/Renderer.h"
 
 /**
  * @class Parking
- * @brief Manages parking occupancy detection and visualization.
+ * @brief High-level manager for parking occupancy estimation and rendering.
  *
- * The Parking class loads parking slot definitions from a JSON file,
- * tracks frame-to-frame motion to align video frames to a reference image,
- * updates the occupancy state of each parking place, and provides
- * visualization utilities for rendering parking status and statistics.
+ * The Parking class represents a full parking area composed of multiple
+ * ParkingPlace instances. It is responsible for:
+ *
+ *  - loading parking place definitions from a configuration file,
+ *  - aligning incoming frames to a reference image,
+ *  - updating the occupancy state of each parking place,
+ *  - aggregating global statistics (e.g. number of occupied places),
+ *  - providing rendering-friendly data for visualization layers.
+ *
+ * This class does NOT perform low-level vision algorithms itself; it
+ * orchestrates specialized components (Aligner, ParkingPlace, Renderer).
  */
 class Parking {
 private:
-    int _numOccupied;
-    std::vector<ParkingPlace> _places;
-    cv::Mat _reference;
-    
-    cv::Mat _prevGray;
-    std::vector<cv::Point2f> _prevPts;
-    std::vector<cv::Point2f> _refPts;
-    bool _flowInitialized = false;
+    /**
+     * @brief Number of currently occupied parking places.
+     *
+     * This value is recomputed at each evolve() call based on the
+     * state of all ParkingPlace instances.
+     */
+    int _numOccupied{0};
 
     /**
-     * @brief Initializes reference features for optical flow tracking.
-     *
-     * Detects stable feature points in the reference image that will be
-     * used to align incoming frames using optical flow.
+     * @brief Collection of managed parking places.
      */
-    void initReference();
+    std::vector<ParkingPlace> _places;
 
+    /**
+     * @brief Frame-to-frame alignment helper.
+     *
+     * Used to compensate for camera motion by aligning incoming frames
+     * to a fixed reference image.
+     */
+    Aligner _aligner;
+
+    /**
+     * @brief Rendering helper used to generate visualization data.
+     */
+    Renderer _renderer;
 
 public:
     /**
-     * @brief Constructs a Parking object from a configuration file and reference image.
+     * @brief Constructs a Parking manager from a configuration file.
      *
-     * Loads parking place definitions from a JSON file, initializes internal
-     * data structures, and prepares the reference frame used for motion alignment.
+     * The constructor:
+     *  - loads parking place geometries from a JSON file,
+     *  - initializes all ParkingPlace instances,
+     *  - stores the reference frame used for alignment.
      *
      * @param jsonPath Path to the JSON file describing parking places.
      * @param reference Reference image used for frame alignment.
      */
     Parking(const std::string& jsonPath, cv::Mat reference);
 
-
     /**
      * @brief Returns the total number of parking places.
      *
-     * @return Number of parking places.
+     * @return Total number of managed parking places.
      */
     size_t getNumPlace() const;
 
     /**
      * @brief Returns the number of currently occupied parking places.
      *
-     * @return Number of occupied places.
+     * This value reflects the result of the last evolve() call.
+     *
+     * @return Number of occupied parking places.
      */
     int getNumOccupied() const;
 
     /**
-     * @brief Updates the occupancy state of all parking places.
+     * @brief Updates the state of the parking using a new video frame.
      *
-     * Evaluates each parking place using the current frame and updates
-     * the global occupancy count accordingly.
+     * The method:
+     *  - aligns the current frame to the reference image,
+     *  - updates each ParkingPlace state,
+     *  - recomputes global occupancy statistics.
      *
      * @param frame Current video frame.
      */
     void evolve(cv::Mat& frame);
 
     /**
-     * @brief Updates the occupancy state of all parking places.
+     * @brief Returns rendering data for all parking places.
      *
-     * Evaluates each parking place using the current frame and updates
-     * the global occupancy count accordingly.
+     * This method exposes lightweight, rendering-oriented data structures
+     * that can be consumed by visualization layers (OpenCV overlays, UI,
+     * bindings, etc.) without exposing internal logic.
      *
-     * @param frame Current video frame.
+     * @return Vector of RenderPlace objects.
      */
-    void drawParking(cv::Mat& frame);
-
-    /**
-     * @brief Aligns the current frame to the reference image.
-     *
-     * Uses optical flow and affine transformation estimation to compensate
-     * for camera motion and stabilize the frame.
-     *
-     * @param frame Input frame to be aligned.
-     * @param warped Output aligned frame.
-     * @return True if alignment succeeds, false otherwise.
-     */
-    bool alignToReference(const cv::Mat& frame, cv::Mat& warped);
-
-    /**
-     * @brief Adds an informational banner to the output frame.
-     *
-     * Displays runtime information such as FPS and parking occupancy
-     * statistics on a banner overlay.
-     *
-     * @param frame Original frame.
-     * @param output Frame with banner added.
-     * @param fps Current frames per second.
-     */
-    void addBanner(const cv::Mat& frame, cv::Mat& output, const double& fps);
+    std::vector<RenderPlace> getRenderData() const;
 };
-
-

@@ -2,7 +2,7 @@
 
 HeavyEstimator::HeavyEstimator(){}
 
-cv::Mat HeavyEstimator::wrap(cv::Mat& frame, cv::Point coords[4]){
+cv::Mat HeavyEstimator::wrap(const cv::Mat& frame, const std::array<cv::Point, 4>& coords){
     float W = static_cast<int>(cv::norm(coords[0] - coords[1]));
     float H = static_cast<int>(cv::norm(coords[0] - coords[3]));
 
@@ -35,7 +35,7 @@ cv::Mat HeavyEstimator::wrap(cv::Mat& frame, cv::Point coords[4]){
     return warped;
 }
 
-bool HeavyEstimator::isOccupied(cv::Mat& wraped){
+bool HeavyEstimator::isOccupied(const cv::Mat& wraped){
     cv::Mat ycrcb;
     cv::cvtColor(wraped, ycrcb, cv::COLOR_BGR2YCrCb);
 
@@ -54,7 +54,7 @@ bool HeavyEstimator::isOccupied(cv::Mat& wraped){
     return false;
 }
 
-bool HeavyEstimator::operator()(cv::Mat& frame, cv::Point coords[4]){
+bool HeavyEstimator::operator()(const cv::Mat& frame, const std::array<cv::Point, 4>& coords){
     cv::Mat wrapped = wrap(frame, coords);
     return isOccupied(wrapped);
 }

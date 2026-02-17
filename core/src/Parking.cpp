@@ -1,7 +1,7 @@
 #include "smart_parking/Parking.h"
 
 Parking::Parking(const std::string& jsonPath, cv::Mat reference)
-    : _numOccupied(0)
+    : _numOccupied(0), _aligner(reference)
 {
     // Open JSON configuration file
     std::ifstream file(jsonPath);
@@ -38,7 +38,7 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
         }
 
         // Convert JSON coordinates to OpenCV points
-        cv::Point coords_arr[4];
+        std::array<cv::Point, 4> coords_arr;
         bool coords_ok = true;
 
         for (int i = 0; i < 4; ++i) {
@@ -64,32 +64,9 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
     // Count initially occupied places
     _numOccupied = 0;
     for (auto& place : _places) {
-        if (place.getState() == OCCUPIED)
+        if (place.getState() == PlaceState::OCCUPIED)
             ++_numOccupied;
     }
-
-    // Store reference image and initialize tracking
-    _reference = reference;
-    initReference();
-}
-
-void Parking::initReference()
-{
-    cv::Mat gray;
-    cv::cvtColor(_reference, gray, cv::COLOR_BGR2GRAY);
-
-    // Detect strong corners to track
-    cv::goodFeaturesToTrack(
-        gray,
-        _refPts,
-        500,   // maximum number of corners
-        0.01,  // quality level
-        10     // minimum distance between points
-    );
-
-    _prevGray = gray.clone();
-    _prevPts  = _refPts;
-    _flowInitialized = true;
 }
 
 size_t Parking::getNumPlace() const {
@@ -101,134 +78,38 @@ int Parking::getNumOccupied() const {
 }
 
 void Parking::evolve(cv::Mat& frame) {
+
+    // Align current frame with the reference image
+    cv::Mat output;
+    if (!_aligner(frame, output))return;
     int newCount = 0;
 
     for (auto& place : _places) {
-        place.changeState(frame);
+        place.changeState(output);
 
-        if (place.getState() == OCCUPIED ||
-            place.getState() == TRANSITION_OUT)
+        if (place.getState() == PlaceState::OCCUPIED ||
+            place.getState() == PlaceState::TRANSITION_OUT)
         {
             newCount++;
         }
     }
 
     _numOccupied = newCount;
+    _renderer(output, getRenderData(), frame, _numOccupied, getNumPlace());
 }
 
-void Parking::drawParking(cv::Mat& frame){
-    cv::Mat overlay = frame.clone();
+std::vector<RenderPlace> Parking::getRenderData() const {
+    std::vector<RenderPlace> out;
+    out.reserve(_places.size());
 
-    for (auto& place : _places) {
-        place.drawPlace(frame, overlay);
+    for (const auto& place : _places) {
+        out.push_back({
+            { place.getCoords()[0],
+              place.getCoords()[1],
+              place.getCoords()[2],
+              place.getCoords()[3] },
+            place.getState()
+        });
     }
-
-    // Blend overlay with original frame
-    cv::addWeighted(frame, 0.6, overlay, 0.4, 0.0, frame);
-}
-
-bool Parking::alignToReference(const cv::Mat& frame, cv::Mat& warped){
-    if (!_flowInitialized)
-        return false;
-
-    cv::Mat gray;
-    cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
-
-    std::vector<cv::Point2f> currPts;
-    std::vector<uchar> status;
-    std::vector<float> err;
-
-    // Track reference points using optical flow
-    cv::calcOpticalFlowPyrLK(
-        _prevGray,
-        gray,
-        _prevPts,
-        currPts,
-        status,
-        err
-    );
-
-    // Keep only valid tracked points
-    std::vector<cv::Point2f> src, dst;
-    for (size_t i = 0; i < status.size(); ++i) {
-        if (status[i]) {
-            src.push_back(currPts[i]);  // current frame points
-            dst.push_back(_refPts[i]);  // reference points
-        }
-    }
-
-    if (src.size() < 10)
-        return false;
-
-    // Estimate affine transformation
-    std::vector<uchar> inliers;
-    cv::Mat A = cv::estimateAffinePartial2D(
-        src,
-        dst,
-        inliers,
-        cv::RANSAC
-    );
-
-    if (A.empty())
-        return false;
-
-    // Warp frame to reference coordinates
-    cv::warpAffine(frame, warped, A, _reference.size());
-
-    // Update tracking state
-    _prevGray = gray.clone();
-    _prevPts  = currPts;
-
-    return true;
-}
-
-void Parking::addBanner(const cv::Mat& frame, cv::Mat& output, const double& fps){
-    int W = frame.cols;
-    int H = frame.rows;
-
-    // Banner height (12% of frame height)
-    int bannerH = static_cast<int>(0.12 * H);
-
-    cv::Mat banner(
-        bannerH,
-        W,
-        frame.type(),
-        cv::Scalar(30, 30, 30)
-    );
-
-    int free = getNumPlace() - getNumOccupied();
-
-    std::string fpsText   = "FPS: " + std::to_string(static_cast<int>(fps));
-    std::string ratioText = "Free : " +
-                            std::to_string(free) + "/" +
-                            std::to_string(getNumPlace());
-
-    int font = cv::FONT_HERSHEY_SIMPLEX;
-    double fontScale = bannerH / 60.0;
-    int thickness = 2;
-    cv::Scalar color(255, 255, 255);
-
-    int baseline = 0;
-    cv::Size textSize = cv::getTextSize(
-        ratioText,
-        font,
-        fontScale,
-        thickness,
-        &baseline
-    );
-
-    int x = W - textSize.width - 20;
-    int y = (bannerH - (textSize.height + baseline)) / 2 + textSize.height;
-
-    cv::putText(banner, fpsText, cv::Point(20, y),
-                font, fontScale, color, thickness, cv::LINE_AA);
-
-    cv::putText(banner, ratioText, cv::Point(x, y),
-                font, fontScale, color, thickness, cv::LINE_AA);
-
-    // Concatenate banner and frame
-    cv::vconcat(banner, frame, output);
-
-    // Resize back to original frame size
-    cv::resize(output, output, frame.size(), 0, 0, cv::INTER_LINEAR);
+    return out;
 }

@@ -2,48 +2,124 @@
 
 #include <opencv2/opencv.hpp>
 #include <future>
+#include <optional>
+#include <chrono>
+
 #include "smart_parking/LightVision.h"
-#include "smart_parking/StateManager.h"
+#include "smart_parking/HeavyEstimator.h"
+#include "smart_parking/PlaceState.h"
 
 /**
  * @class ParkingPlace
  * @brief Represents a single parking slot and manages its occupancy state.
  *
- * The ParkingPlace class models one parking spot defined by four corner points.
- * It provides methods to:
- *  - evaluate occupancy using appearance-based analysis,
- *  - detect motion using background subtraction,
- *  - handle transient states during vehicle entry and exit,
- *  - draw visual annotations on video frames.
+ * ParkingPlace encapsulates all logic related to ONE parking spot:
  *
- * State transitions are handled asynchronously to avoid blocking the main
- * processing loop.
+ *  - geometry (polygon coordinates),
+ *  - lightweight motion detection (LightVision),
+ *  - heavyweight appearance-based occupancy estimation (HeavyEstimator),
+ *  - state management (FREE, OCCUPIED, TRANSITION_IN, TRANSITION_OUT).
+ *
+ * IMPORTANT:
+ * - LightVision and HeavyEstimator NEVER decide the final state.
+ * - ParkingPlace is the sole owner of the state machine.
+ *
+ * Heavy computations are executed asynchronously to avoid blocking
+ * the main processing loop.
  */
 class ParkingPlace {
 private:
+    /**
+     * @brief Unique identifier of the parking place.
+     */
     int _id;
-    cv::Point _coords[4];
-    bool _coordAdjust = false;
+
+    /**
+     * @brief Polygon defining the parking slot (4 corners).
+     */
+    std::array<cv::Point, 4> _coords;
+
+    /**
+     * @brief Indicates whether coordinates were clamped to frame boundaries.
+     */
+    bool _coordAdjust{false};
+
+    /**
+     * @brief Lightweight vision module for motion detection.
+     *
+     * Provides short-term signals (movement, timestamps),
+     * but does not infer occupancy.
+     */
     LightVision _lightVision;
-    StateManager _stateManager;
+
+    /**
+     * @brief Heavy appearance-based occupancy estimator.
+     *
+     * Used only when motion stabilizes or a state transition must be confirmed.
+     */
+    HeavyEstimator _estimator;
+
+    /**
+     * @brief Asynchronous result of a heavy occupancy estimation.
+     *
+     * The future is launched during transitions and collected later.
+     */
+    std::future<bool> _occupancyResultAsc;
+
+    /**
+     * @brief Cached result of the last completed heavy estimation.
+     */
+    std::optional<bool> _occupancyResult;
+
+    /**
+     * @brief Current logical state of the parking place.
+     */
+    PlaceState _currentState{PlaceState::INIT_STATE};
+
+    /**
+     * @brief Timestamp of the last heavy estimation launch or validation.
+     *
+     * Used to enforce cooldowns and temporal consistency.
+     */
+    std::chrono::steady_clock::time_point _lastEstimationTime;
 
 public:
     /**
-     * @brief Constructs a ParkingPlace from four corner coordinates.
+     * @brief Constructs a ParkingPlace from polygon coordinates.
      *
-     * Initializes internal geometry, occupancy mask, and background
-     * subtraction model.
-     *
-     * @param coords Array of four points defining the parking slot polygon.
+     * @param coords Array of four points defining the parking slot.
      * @param id Unique identifier of the parking place.
      */
-    ParkingPlace(const cv::Point coords[4], int id = 0);
+    ParkingPlace(const std::array<cv::Point, 4> coords, int id = 0);
 
     /**
-     * @brief Clamps parking coordinates to remain within frame boundaries.
+     * @brief Checks whether a timestamp is recent relative to a cooldown duration.
      *
-     * If coordinates exceed the frame size, they are adjusted and the
-     * internal mask is recomputed.
+     * @param timestamp Timestamp to compare.
+     * @param coolDownTime Minimum allowed duration.
+     * @return True if timestamp is within cooldown window.
+     */
+    bool isRecent(std::chrono::steady_clock::time_point timestamp,
+                  std::chrono::milliseconds coolDownTime);
+
+    /**
+     * @brief Updates the internal state machine using vision signals.
+     *
+     * This method applies the transition rules using:
+     *  - LightVisionData (motion signal),
+     *  - optional HeavyEstimator result (occupancy confirmation).
+     *
+     * @param data Output of LightVision.
+     * @param info Optional heavy estimation result.
+     * @return True if the state changed.
+     */
+    bool update(LightVisionData& data, std::optional<bool> info);
+
+    /**
+     * @brief Ensures parking coordinates stay inside frame boundaries.
+     *
+     * If coordinates exceed the frame size, they are clamped and
+     * dependent masks are recomputed.
      *
      * @param frameSize Size of the current video frame.
      * @return True if any coordinate was modified.
@@ -51,36 +127,26 @@ public:
     bool adjustCoords(cv::Size& frameSize);
 
     /**
-     * @brief Returns the current state of the parking place.
+     * @brief Returns the current parking place state.
      */
-    placeState getState() const;
+    PlaceState getState() const;
 
     /**
-     * @brief Returns the polygon coordinates defining the parking place.
+     * @brief Returns the polygon defining the parking place.
      *
-     * @return Pointer to an array of four cv::Point.
+     * @return Array of four cv::Point.
      */
-    const cv::Point* getCoords() const;
+    const std::array<cv::Point, 4> getCoords() const;
 
     /**
-     * @brief Updates the parking place state based on motion and appearance.
+     * @brief Main update entry point called for each new frame.
      *
      * This method:
-     *  - launches asynchronous state evaluation when needed,
-     *  - manages transient states (TRANSITION_IN / TRANSITION_OUT),
-     *  - finalizes occupancy state once motion stabilizes.
+     *  - computes motion signals,
+     *  - launches heavy estimations asynchronously when needed,
+     *  - updates the internal state machine accordingly.
      *
      * @param frame Current video frame.
      */
     void changeState(cv::Mat& frame);
-
-    /**
-     * @brief Draws the parking place contour and fill on the output frame.
-     *
-     * Color coding reflects the current occupancy state.
-     *
-     * @param frame Frame where contours are drawn.
-     * @param overlay Semi-transparent overlay for filled polygons.
-     */
-    void drawPlace(cv::Mat& frame, cv::Mat& overlay);
 };
