@@ -1,5 +1,6 @@
 #include "smart_parking/Parking.h"
 
+// Constructor loading parking configuration and initializing components
 Parking::Parking(const std::string& jsonPath, cv::Mat reference)
     : _numOccupied(0), _aligner(reference)
 {
@@ -8,7 +9,6 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open JSON file: " + jsonPath);
     }
-
 
     // Parse JSON content
     nlohmann::json j;
@@ -51,6 +51,7 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
             coords_arr[i].y = p["y"].get<int>();
         }
 
+        // Skip malformed parking place definitions
         if (!coords_ok) {
             std::cerr << "Skipping place " << id_counter << " : malformed point\n";
             continue;
@@ -69,24 +70,30 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
     }
 }
 
+// Returns total number of parking places
 size_t Parking::getNumPlace() const {
     return _places.size();
 }
 
+// Returns number of currently occupied places
 int Parking::getNumOccupied() const {
     return _numOccupied;
 }
 
+// Updates parking states for a new video frame
 void Parking::evolve(cv::Mat& frame) {
 
     // Align current frame with the reference image
     cv::Mat output;
-    if (!_aligner(frame, output))return;
+    if (!_aligner(frame, output)) return;
+
     int newCount = 0;
 
+    // Update state of each parking place
     for (auto& place : _places) {
         place.changeState(output);
 
+        // Count occupied and exiting vehicles
         if (place.getState() == PlaceState::OCCUPIED ||
             place.getState() == PlaceState::TRANSITION_OUT)
         {
@@ -94,14 +101,19 @@ void Parking::evolve(cv::Mat& frame) {
         }
     }
 
+    // Update global occupancy count
     _numOccupied = newCount;
+
+    // Render visualization and overlay statistics
     _renderer(output, getRenderData(), frame, _numOccupied, getNumPlace());
 }
 
+// Collect rendering data for all parking places
 std::vector<RenderPlace> Parking::getRenderData() const {
     std::vector<RenderPlace> out;
     out.reserve(_places.size());
 
+    // Convert internal state to renderable structures
     for (const auto& place : _places) {
         out.push_back({
             { place.getCoords()[0],
