@@ -70,7 +70,7 @@ This multi-level structure ensures a clear separation between perception, local 
 
 ## 7. Performance Summary
 
-FPS : 10
+FPS : 12 to 14 (Recording make it drop between 9 and 11)
 Résolution : 1080p
 CPU : (future)
 inference latency : (future)
@@ -126,4 +126,4 @@ These trade-offs are intentional to preserve computational efficiency, determini
 
 ## 10. Repository Structure
 
-11. Conclusion
+## 11. Conclusion
