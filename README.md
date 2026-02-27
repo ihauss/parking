@@ -88,7 +88,7 @@ smart_parking/
 ├── core/
 ├── embedded/
 ├── bindings/
-├── api/        (future)
+├── api/
 └── README.md
 
 
@@ -99,16 +99,3 @@ smart_parking/
 Ce que ce projet démontre
 
 Pourquoi il est intéressant techniquement
-
-
-## 2. Scope and Constraints
-## 3. System Overview
-## 4. Architecture
-## 5. Technical Choices
-## 6. Demo and Visualization
-## 7. Performance
-## 8. Limitations
-## 9. Future Work
-
-
-## 11. Conclusion
