@@ -1,8 +1,10 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
-#include "smart_parking/LightVisionData.h"
 #include <array>
+
+#include "smart_parking/LightVisionData.h"
+#include "smart_parking/Logger.h"
 
 /**
  * @class LightVision
@@ -26,7 +28,7 @@ private:
     cv::Mat _mask;
 
     /** Indicates whether the parking mask has already been initialized */
-    bool hasMask = false;
+    bool _hasMask = false;
 
     /** Background subtractor used for motion detection */
     cv::Ptr<cv::BackgroundSubtractorKNN> _knn;

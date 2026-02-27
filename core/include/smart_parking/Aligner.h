@@ -2,6 +2,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "smart_parking/Logger.h"
+
 /**
  * @class Aligner
  * @brief Frame-to-reference image alignment using optical flow.
@@ -40,6 +42,9 @@ private:
     /// Indicates whether optical flow tracking has been initialized
     bool _flowInitialized = false;
 
+    cv::Mat _lastAffine;
+    bool _affineValid = false;
+
     /**
      * @brief Initializes feature points on the reference image.
      *
@@ -71,4 +76,7 @@ public:
      *         (e.g. insufficient tracked points or unstable estimation).
      */
     bool operator()(const cv::Mat& frame, cv::Mat& warped);
+
+    bool hasAffine() const;
+    cv::Mat getAffine() const;
 };

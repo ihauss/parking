@@ -3,5 +3,5 @@ add_executable(smart_parking_embedded
 )
 
 target_link_libraries(smart_parking_embedded
-    PRIVATE smart_parking_core
+    PRIVATE smart_parking_core_lib
 )

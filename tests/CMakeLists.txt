@@ -18,7 +18,7 @@ add_executable(core_tests
 
 target_link_libraries(core_tests
     PRIVATE
-        smart_parking_core
+        smart_parking_core_lib
         GTest::gtest_main
 )
 

@@ -8,6 +8,7 @@
 #include "smart_parking/LightVision.h"
 #include "smart_parking/HeavyEstimator.h"
 #include "smart_parking/PlaceState.h"
+#include "smart_parking/Logger.h"
 
 /**
  * @class ParkingPlace

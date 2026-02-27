@@ -1,4 +1,4 @@
-add_library(smart_parking_core
+add_library(smart_parking_core_lib
     src/Parking.cpp
     src/ParkingPlace.cpp
     src/utils.cpp
@@ -8,12 +8,16 @@ add_library(smart_parking_core
     src/Renderer.cpp
 )
 
-target_include_directories(smart_parking_core
+set_target_properties(smart_parking_core_lib PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+target_include_directories(smart_parking_core_lib
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(smart_parking_core
+target_link_libraries(smart_parking_core_lib
     PUBLIC
         ${OpenCV_LIBS}
         nlohmann_json::nlohmann_json

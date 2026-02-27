@@ -2,5 +2,6 @@
 build/
 dataset/
 output/
+CMakeFiles/
 dataset.zip
 dataset_one_class.zip

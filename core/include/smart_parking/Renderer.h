@@ -1,7 +1,9 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+
 #include "smart_parking/RenderPlace.h"
+#include "smart_parking/Logger.h"
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -36,6 +38,22 @@ public:
      * @param alpha Smoothing factor (0 < alpha <= 1).
      */
     void updateFPS(double alpha);
+
+    /**
+     * @brief Returns last FPS.
+     *
+     * This value reflects the result of the last updateFPS() call.
+     *
+     * @return Current FPS.
+     */
+    double getFps() const;
+
+    /**
+     * @brief Returns the FPS estimation.
+     *
+     * @return Last FPS measured.
+     */
+    size_t getNumPlace() const;
 
     /**
      * @brief Draws parking places on a frame.

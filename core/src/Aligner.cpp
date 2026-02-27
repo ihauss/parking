@@ -7,6 +7,7 @@ Aligner::Aligner(cv::Mat reference){
 
     // Initialize reference features and optical flow state
     initReference();
+    Logger::log().info("Aligner initialized with reference frame");
 }
 
 // Abort if reference tracking has not been initialized
@@ -65,8 +66,13 @@ bool Aligner::operator()(const cv::Mat& frame, cv::Mat& warped){
     );
 
     // Abort if affine estimation failed
-    if (A.empty())
+    if (A.empty()) {
+        _affineValid = false;
         return false;
+    }
+
+    _lastAffine = A.clone();
+    _affineValid = true;
 
     // Warp the current frame into reference coordinate space
     cv::warpAffine(frame, warped, A, _reference.size());
@@ -104,4 +110,21 @@ void Aligner::initReference()
 
     // Mark optical flow system as ready
     _flowInitialized = true;
+
+    if (_refPts.empty()) {
+        Logger::log().warn("Aligner initialized with 0 reference points");
+    }
+    else{
+        Logger::log().info(
+            "Aligner reference initialized with " + std::to_string(_refPts.size()) + " points"
+        );
+    }
+}
+
+bool Aligner::hasAffine() const {
+    return _affineValid;
+}
+
+cv::Mat Aligner::getAffine() const {
+    return _lastAffine;
 }

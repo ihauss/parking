@@ -11,6 +11,11 @@ cv::Mat HeavyEstimator::wrap(const cv::Mat& frame, const std::array<cv::Point, 4
     // Estimate warped image height using left edge length
     float H = static_cast<int>(cv::norm(coords[0] - coords[3]));
 
+    if (W < 5 || H < 5) {
+        Logger::log().error("HeavyEstimator::wrap - invalid warp size");
+        return cv::Mat();
+    }
+
     // Source points: original parking polygon corners
     std::vector<cv::Point2f> srcPts = {
         cv::Point2f(coords[0]),
@@ -29,6 +34,10 @@ cv::Mat HeavyEstimator::wrap(const cv::Mat& frame, const std::array<cv::Point, 4
 
     // Compute perspective transformation matrix
     cv::Mat h = cv::getPerspectiveTransform(srcPts, dstPts);
+    if (h.empty()) {
+        Logger::log().error("HeavyEstimator::wrap - perspective transform failed");
+        return cv::Mat();
+    }
 
     // Output warped image
     cv::Mat warped;
@@ -76,6 +85,10 @@ bool HeavyEstimator::isOccupied(const cv::Mat& wraped){
 bool HeavyEstimator::operator()(const cv::Mat& frame, const std::array<cv::Point, 4>& coords){
     // Normalize parking region geometry
     cv::Mat wrapped = wrap(frame, coords);
+    if (wrapped.empty()) {
+        Logger::log().warn("HeavyEstimator failed to warp parking region");
+        return true; // conservative default
+    }
 
     // Infer occupancy from appearance statistics
     return isOccupied(wrapped);

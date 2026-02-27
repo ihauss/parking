@@ -3,6 +3,8 @@
 #include <opencv2/opencv.hpp>
 #include <array>
 
+#include "smart_parking/Logger.h"
+
 /**
  * @class HeavyEstimator
  * @brief High-cost visual occupancy estimator for a single parking place.

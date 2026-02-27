@@ -87,6 +87,11 @@ bool ParkingPlace::adjustCoords(cv::Size& frameSize)
     }
     _coordAdjust = true;
 
+    if (modified) {
+        Logger::log().warn("ParkingPlace " + std::to_string(_id) +
+                    " coords clamped to frame boundaries");
+    }
+
     return modified;
 }
 
@@ -110,9 +115,18 @@ void ParkingPlace::changeState(cv::Mat& frame) {
 
     // Launch heavy estimator asynchronously if needed
     if(needHeavyEstimation){
-        _occupancyResultAsc = std::async(std::launch::async, 
-            [this, frame]() mutable 
-            {return _estimator(frame, _coords);}
+        _occupancyResultAsc = std::async(std::launch::async,
+            [this, frame]() mutable {
+                try {
+                    return _estimator(frame, _coords);
+                } catch (const std::exception& e) {
+                    Logger::log().error(
+                        "ParkingPlace " + std::to_string(_id) +
+                        " heavy estimator failed: " + e.what()
+                    );
+                    throw;
+                }
+            }
         );
     }
 

@@ -7,6 +7,7 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
     // Open JSON configuration file
     std::ifstream file(jsonPath);
     if (!file.is_open()) {
+        Logger::log().error("Failed to open JSON file: " + jsonPath);
         throw std::runtime_error("Failed to open JSON file: " + jsonPath);
     }
 
@@ -14,7 +15,9 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
     nlohmann::json j;
     try {
         file >> j;
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
+        Logger::log().error(std::string("Failed to parse JSON: ") + e.what());
         throw std::runtime_error(
             std::string("Failed to parse JSON: ") + e.what()
         );
@@ -22,6 +25,7 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
 
     // Validate JSON structure
     if (!j.contains("parking_places") || !j["parking_places"].is_array()) {
+        Logger::log().error("Invalid JSON format: missing parking_places");
         throw std::runtime_error("Invalid JSON format: missing parking_places");
     }
 
@@ -33,7 +37,10 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
 
         // Check that coordinates exist and form a quadrilateral
         if (!item.contains("coords") || !item["coords"].is_array() || item["coords"].size() != 4) {
-            std::cerr << "Skipping place " << id_counter << " : 'coords' missing or not length 4\n";
+            Logger::log().warn(
+                "Skipping place " + std::to_string(id_counter) +
+                ": 'coords' missing or not length 4"
+            );
             continue;
         }
 
@@ -68,6 +75,11 @@ Parking::Parking(const std::string& jsonPath, cv::Mat reference)
         if (place.getState() == PlaceState::OCCUPIED)
             ++_numOccupied;
     }
+
+    Logger::log().info(
+        "Parking initialized with " +
+        std::to_string(_places.size()) + " places"
+    );
 }
 
 // Returns total number of parking places
@@ -80,8 +92,30 @@ int Parking::getNumOccupied() const {
     return _numOccupied;
 }
 
+// Returns number of current FPS
+double Parking::getFps() const {
+    return _renderer.getFps();
+}
+
+// Returns number of current latency
+double Parking::getLastLatencyMs() const {
+    return _lastLatencyMs;
+}
+
+// Return system metrics converted to json 
+std::map<std::string, double> Parking::getStats() const {
+    return {
+        {"fps", _renderer.getFps()},
+        {"latency_ms", getLastLatencyMs()},
+        {"occupied", static_cast<double>(getNumOccupied())},
+        {"free", static_cast<double>(getNumPlace() - getNumOccupied())},
+        {"total", static_cast<double>(getNumPlace())}
+    };
+}
+
 // Updates parking states for a new video frame
 void Parking::evolve(cv::Mat& frame) {
+    auto t0 = std::chrono::steady_clock::now();
 
     // Align current frame with the reference image
     cv::Mat output;
@@ -106,6 +140,10 @@ void Parking::evolve(cv::Mat& frame) {
 
     // Render visualization and overlay statistics
     _renderer(output, getRenderData(), frame, _numOccupied, getNumPlace());
+
+    auto t1 = std::chrono::steady_clock::now();
+    _lastLatencyMs =
+        std::chrono::duration<double, std::milli>(t1 - t0).count();
 }
 
 // Collect rendering data for all parking places
@@ -124,4 +162,17 @@ std::vector<RenderPlace> Parking::getRenderData() const {
         });
     }
     return out;
+}
+
+bool Parking::hasAffine() const {
+    return _aligner.hasAffine();
+}
+
+std::array<double, 6> Parking::getAffine() const {
+    const cv::Mat& A = _aligner.getAffine();
+
+    return {
+        A.at<double>(0,0), A.at<double>(0,1), A.at<double>(0,2),
+        A.at<double>(1,0), A.at<double>(1,1), A.at<double>(1,2)
+    };
 }

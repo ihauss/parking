@@ -9,7 +9,12 @@ LightVision::LightVision(){
 void LightVision::initMask(const std::array<cv::Point, 4>& coords){
     // Compute bounding box enclosing the parking polygon
     cv::Rect bbox = cv::boundingRect(std::vector<cv::Point>(coords.begin(), coords.end()));
-   
+    if (bbox.width <= 0 || bbox.height <= 0) {
+        Logger::log().error("LightVision::initMask - invalid bounding box");
+        _hasMask = false;
+        return;
+    }
+
     // Convert polygon points to local coordinates inside the bounding box
     std::vector<cv::Point> polyLocal;
     for (int i = 0; i < 4; ++i) {
@@ -21,15 +26,27 @@ void LightVision::initMask(const std::array<cv::Point, 4>& coords){
 
     // Fill polygon area with foreground value
     cv::fillPoly(_mask, std::vector<std::vector<cv::Point>>{polyLocal}, 255);
+    if (cv::countNonZero(_mask) == 0) {
+        Logger::log().error("LightVision::initMask - empty mask");
+        _hasMask = false;
+        return;
+    }
+    _hasMask = true;
 }
 
 // Computes motion activity inside the parking area
 bool LightVision::computeMotionSignal(const cv::Mat& frame, const std::array<cv::Point, 4>& coords, double thresh){
     // Initialize parking mask on first use
-    if(!hasMask) initMask(coords);
+    if(!_hasMask) initMask(coords);
 
     // Extract region of interest corresponding to the parking area
     cv::Rect bbox = cv::boundingRect(std::vector<cv::Point>(coords.begin(), coords.end()));
+    if (bbox.x < 0 || bbox.y < 0 ||
+        bbox.x + bbox.width  > frame.cols ||
+        bbox.y + bbox.height > frame.rows)
+    {
+        return false;
+    }
     cv::Mat roi = frame(bbox);
 
     // Foreground mask from background subtraction
@@ -44,7 +61,10 @@ bool LightVision::computeMotionSignal(const cv::Mat& frame, const std::array<cv:
     cv::morphologyEx(fgMask, fgMask, cv::MORPH_OPEN, kernel);
 
     // Compute ratio of moving pixels inside the parking area
-    double motionRatio = cv::countNonZero(fgMask) / (double)cv::countNonZero(_mask);
+    double maskArea = cv::countNonZero(_mask);
+    if (maskArea == 0)
+        return false;
+    double motionRatio = cv::countNonZero(fgMask) / (double)maskArea;
 
     // Ignore motion during background model warm-up
     if(_warmUp){

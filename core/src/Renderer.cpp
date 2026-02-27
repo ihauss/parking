@@ -7,12 +7,14 @@
  * (excluding INIT_STATE, which is never rendered).
  *
  * Mapping:
+ *  - INIT_STATE      : Dark Gray
  *  - FREE            : Green
  *  - TRANSITION_IN   : Orange
  *  - OCCUPIED        : Red
  *  - TRANSITION_OUT  : Yellow
  */
-const std::array<cv::Scalar, 4> COLORS = {
+const std::array<cv::Scalar, 5> COLORS = {
+    cv::Scalar(75, 75, 75),    // INIT_STATE
     cv::Scalar(0, 255, 0),    // FREE
     cv::Scalar(0, 127, 255),  // TRANSITION_IN
     cv::Scalar(0, 0, 255),    // OCCUPIED
@@ -27,25 +29,54 @@ void Renderer::updateFPS(double alpha){
     _tPrev = tNow;
 
     // Instantaneous FPS
+     if (dt <= 0.0) {
+        Logger::log().warn("Renderer: non-positive delta time for FPS computation");
+        return;
+    }
     double currentFps = 1.0 / dt;
 
     // Exponential moving average for smoother FPS display
+    if (alpha <= 0.0 || alpha > 1.0) {
+    Logger::log().warn("Renderer: invalid alpha for FPS EMA, using default 0.1");
+        alpha = 0.1;
+    }
     _fps = (_fps == 0.0)
         ? currentFps
         : alpha * currentFps + (1.0 - alpha) * _fps;
 }
 
+// Return the current fps estimation.
+double Renderer::getFps() const {
+    return _fps;
+}
+
 //Draw parking places on the frame.
 void Renderer::draw(cv::Mat& frame, const std::vector<RenderPlace>& places){
+    if (frame.empty()) {
+        Logger::log().error("Renderer::draw called with empty frame");
+        return;
+    }
+
     // Overlay used for semi-transparent filling
+    if (places.empty())return;
     cv::Mat overlay = frame.clone();
 
     for (const auto& p : places) {
+        if (p.coords.size() < 3) {
+            Logger::log().warn("Renderer: place with insufficient polygon points");
+            continue;
+        }
+
         std::vector<std::vector<cv::Point>> contour;
         contour.emplace_back(p.coords.begin(), p.coords.end());
 
         // Select color according to parking state
-        cv::Scalar color = COLORS[static_cast<int>(p.state) - 1];
+        int idx = static_cast<int>(p.state);
+        if (idx < 0 || idx >= static_cast<int>(COLORS.size())) {
+            Logger::log().warn("Renderer: invalid PlaceState encountered");
+            continue;
+        }
+        cv::Scalar color = COLORS[idx];
 
         // Draw outline
         cv::polylines(frame, contour, true, color, 3, cv::LINE_AA);
@@ -65,6 +96,24 @@ void Renderer::addBanner(
     int numOccupied,
     int numPlace
 ){
+    if (frame.empty()) {
+        Logger::log().error("Renderer::addBanner called with empty frame");
+        output = frame;
+        return;
+    }
+
+    if (numOccupied > numPlace || numOccupied < 0 || numPlace <= 0) {
+        Logger::log().warn(
+            "Renderer: inconsistent parking stats (occupied=" +
+            std::to_string(numOccupied) + ", total=" +
+            std::to_string(numPlace) + ")"
+        );
+    }
+
+    if (_fps <= 0.0) {
+        Logger::log().warn("Renderer: FPS not initialized yet");
+    }
+
     int W = frame.cols;
     int H = frame.rows;
 
@@ -129,6 +178,15 @@ void Renderer::operator()(
     int numOccupied,
     int numPlace
 ){
+    if (frame.empty()) {
+        Logger::log().error("Renderer::operator() called with empty frame");
+        return;
+    }
+
+    if (places.empty()) {
+        Logger::log().info("Renderer: no places to render");
+    }
+
     // Draw parking slots and occupancy status
     draw(frame, places);
 

@@ -5,11 +5,13 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <chrono>
 
 #include "ParkingPlace.h"
 #include "smart_parking/Aligner.h"
 #include "smart_parking/RenderPlace.h"
 #include "smart_parking/Renderer.h"
+#include "smart_parking/Logger.h"
 
 /**
  * @class Parking
@@ -41,6 +43,11 @@ private:
      * @brief Collection of managed parking places.
      */
     std::vector<ParkingPlace> _places;
+
+    /**
+     * @brief Last observed latency of the full pipeline.
+     */
+    double _lastLatencyMs{0.0};
 
     /**
      * @brief Frame-to-frame alignment helper.
@@ -86,6 +93,33 @@ public:
     int getNumOccupied() const;
 
     /**
+     * @brief Returns last FPS.
+     *
+     * This value reflects the result of the last evolve() call.
+     *
+     * @return Current FPS.
+     */
+    double getFps() const;
+
+    /**
+     * @brief Returns last latency measured in ms.
+     *
+     * This value reflects the result of the last evolve() call.
+     *
+     * @return Last latency of evolve function.
+     */
+    double getLastLatencyMs() const;
+
+    /**
+     * @brief Return system metrics converted to json 
+     *
+     * This value reflects the result of the last evolve() call.
+     *
+     * @return Last evaluation of evolve function into a json file.
+     */
+    std::map<std::string, double> getStats() const;
+
+    /**
      * @brief Updates the state of the parking using a new video frame.
      *
      * The method:
@@ -107,4 +141,7 @@ public:
      * @return Vector of RenderPlace objects.
      */
     std::vector<RenderPlace> getRenderData() const;
+
+    bool hasAffine() const;
+    std::array<double, 6> getAffine() const;
 };

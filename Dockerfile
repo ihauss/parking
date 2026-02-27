@@ -1,56 +1,91 @@
 # =========================
-# Build stage
+# Builder C++
 # =========================
-FROM debian:bookworm AS build
+FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# ---- Install build dependencies ----
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
+    git \
     pkg-config \
     libopencv-dev \
     nlohmann-json3-dev \
+    python3 \
+    python3-dev \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-# Copy entire project
+WORKDIR /build
 COPY . .
 
-# ---- Configure and build ----
-RUN cmake -S . -B build \
+# ---------- API BUILD ----------
+RUN cmake -S . -B build_api \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/opencv4 \
- && cmake --build build -j$(nproc)
+    -DBUILD_API=ON \
+    -DBUILD_EMBEDDED=OFF \
+    -DBUILD_TESTS=OFF \
+ && cmake --build build_api -j$(nproc)
 
-# ---- Run tests (fail build if tests fail) ----
-RUN ctest --test-dir build --output-on-failure
-
+# ---------- EMBEDDED BUILD ----------
+RUN cmake -S . -B build_embedded \
+    -DBUILD_API=OFF \
+    -DBUILD_EMBEDDED=ON \
+    -DBUILD_TESTS=OFF \
+ && cmake --build build_embedded -j$(nproc)
 
 # =========================
-# Runtime stage
+# API Runtime
 # =========================
-FROM debian:bookworm
+FROM builder AS api
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# ---- Install only runtime dependencies (lighter than -dev) ----
-RUN apt-get update && apt-get install -y \
-    libopencv-dev \
-    nlohmann-json3-dev \
+# System + Python + OpenCV
+    libgl1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Ensure `python` command exists
+RUN ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
 
-# ---- Copy embedded executable ----
-COPY --from=build /app/build/embedded/smart_parking_embedded /usr/local/bin/smart_parking
+# Python dependencies
+COPY api/requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# ---- Copy runtime assets ----
-COPY files /app/files
+# API code
+COPY api/app ./app
 
-# ---- Default entrypoint ----
-ENTRYPOINT ["smart_parking"]
-CMD []
+# Data files
+COPY api/data ./data
+
+# C++ bindings
+COPY --from=builder /build/build_api/bindings/smart_parking_core*.so /app/
+RUN mv /app/smart_parking_core*.so /app/smart_parking_core.so
+
+ENV PYTHONPATH=/app
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# =========================
+# Embedded Runtime
+# =========================
+FROM builder AS embedded
+
+RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Data files
+COPY files ./files
+
+COPY --from=builder /build/build_embedded/embedded/smart_parking_embedded .
+
+CMD ["./smart_parking_embedded", "--headless"]
