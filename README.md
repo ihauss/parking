@@ -70,15 +70,21 @@ This multi-level structure ensures a clear separation between perception, local 
 
 ## 7. Performance Summary
 
-FPS : 12 to 14 (Recording make it drop between 9 and 11)
-Résolution : 1080p
-CPU :
-* Architecture: aarch64
-* CPU(s): 8
-* type: ARM
-* Cortex-A55: 1.23 GHz to 2.31 GHz (x6)
-* Cortex-A78: 2.4 GHz to 3.3 GHz (x2)
-inference latency : (future)
+**FPS** : 12 to 14 (Recording make it drop between 9 and 11)
+
+**Résolution** : 1080p
+
+**CPU** :
+
+- Architecture: aarch64
+- CPU(s): 8
+- type: ARM
+- Cortex-A55: 1.23 GHz to 2.31 GHz (x6)
+- Cortex-A78: 2.4 GHz to 3.3 GHz (x2)
+
+**inference** latency : (future)
+
+**RAM** : 6GB
 
 ## 8. Limitations
 
