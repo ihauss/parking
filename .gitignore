@@ -7,3 +7,4 @@ dataset.zip
 dataset_one_class.zip
 smart_parking_env/
 .pytest_cache
+_deps/

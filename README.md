@@ -11,7 +11,7 @@ The challenge addressed in this project is to reliably estimate parking occupanc
 
 ## Status
 
-V0.0.1 complete – Core system stabilized
+V-1.0.0 complete – Core system stabilized
 API production-ready
 Deterministic state management
 Dockerized deployment validated
@@ -65,14 +65,12 @@ This multi-level structure ensures a clear separation between perception, local 
 ## 6. Demo & Visualization
 
 <p align="center">
-  <video width="640" height="480" controls>
-    <source src="docs/demo.mp4" type="video/mp4">
-  </video>
+  <img src="docs/demo.gif" width="800">
 </p>
 
 ## 7. Performance Summary
 
-FPS : 9 to 14
+FPS : 10
 Résolution : 1080p
 CPU : (future)
 inference latency : (future)
@@ -111,7 +109,7 @@ These trade-offs are intentional to preserve computational efficiency, determini
 
 ## 9. Roadmap / Future Work
 
-### V0.0.2 – Robustness & Multi-Camera Foundations
+### V-1.0.1 – Robustness & Multi-Camera Foundations
 
 - Crash recovery validation and restart testing  
 - Strengthened state persistence guarantees  
