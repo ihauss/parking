@@ -5,4 +5,4 @@ output/
 CMakeFiles/
 dataset.zip
 dataset_one_class.zip
-smart_parking_env
+smart_parking_env/
