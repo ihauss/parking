@@ -11,91 +11,121 @@ The challenge addressed in this project is to reliably estimate parking occupanc
 
 ## Status
 
-Phase 0 – Consolidation.
+V0.0.1 complete – Core system stabilized
+API production-ready
+Deterministic state management
+Dockerized deployment validated
 
-Core architecture refactored.
-API stabilization in progress.
-Docker restructuring ongoing.
+## 2. Deployment
 
-## 2. Design Philosophy & Constraints
+### API
+docker build -t smart-parking-api --target api .
+docker run -p 8000:8000 smart-parking-api
 
-(fusion de “Scope and Constraints” + vision)
+### Embedded
+docker build -t smart-parking-embedded --target embedded .
+docker run smart-parking-embedded
 
-Pourquoi CPU-only
+## 3. Design Philosophy & Constraints
 
-Pourquoi robustesse > précision brute
+### CPU-Only by Design
 
-Pourquoi séparation light / heavy
+The system targets CPU-only execution to ensure low deployment cost, portability, and energy efficiency. 
 
-👉 Très important pour montrer ta maturité d’ingénieur.
+Given the constrained top-down viewpoint and limited classification space (occupied vs. free), a carefully engineered vision pipeline provides sufficient reliability without GPU acceleration.
 
-## 3. System Overview
+While this limits multi-camera scalability on a single device, it enforces computational discipline and edge compatibility from the ground up.
 
-Pipeline global (haut niveau)
+## 4. System Overview
 
-Vue boîte noire
+<p align="center">
+  <img src="docs/system_overview.png" width="750">
+</p>
 
-Pas de classes, pas de fichiers
+---
 
-## 4. High-Level Architecture
+The system operates as a hierarchical evaluation pipeline designed for constrained environments.
 
-Modules principaux
+An input image first passes through the **Image Processing** stage, where visual features relevant to parking occupancy are extracted. This layer focuses strictly on perception and remains independent from higher-level business logic.
 
-Flux de données
+The processed observations are then forwarded to the **Spot-Level Evaluation** layer. At this level, each parking space maintains its own evolving state, enabling temporal consistency and stable occupancy estimation even under illumination changes or minor camera displacement.
 
-Décisions vs perception
+The **Parking-Level Aggregation** stage consolidates individual spot states into a coherent global representation of the parking area. This layer acts as the central orchestrator, exposing unified outputs to the external API.
 
-👉 Aucun détail OpenCV / C++ ici
+Depending on the use case, the system provides:
 
-## 5. Demo & Visualization
+- Operational metrics  
+- Rendering information for visualization  
+- Business-level occupancy data  
 
-GIF / vidéo
+This multi-level structure ensures a clear separation between perception, local state evolution, and global aggregation while remaining lightweight and edge-compatible.
 
-Screenshot annoté
+## 5. High-Level Architecture
 
-Résultat final visible
+## 6. Demo & Visualization
 
-## 6. Performance Summary
+<p align="center">
+  <video width="640" height="480" controls>
+    <source src="docs/demo.mp4" type="video/mp4">
+  </video>
+</p>
 
-FPS cible
+## 7. Performance Summary
 
-CPU utilisé
+FPS : 9 to 14
+Résolution : 1080p
+CPU : (future)
+inference latency : (future)
 
-Résolution
+## 8. Limitations
 
-Conditions de test
+The system is designed under specific operational assumptions and constraints.
 
-## 7. Limitations
+### Camera Assumptions
 
-Hypothèses caméra
+- Semi-stable, fixed top-down viewpoint  
+- Limited perspective distortion  
+- Moderate and gradual illumination changes  
+- No extreme weather or heavy occlusion conditions  
 
-Cas non gérés
+Significant camera displacement or drastic viewpoint changes may require recalibration.
 
-Trade-offs assumés
+---
 
-## 8. Roadmap / Future Work
+### Unhandled Scenarios
 
-Séparation API / embedded
+- Severe occlusions (large vehicles overlapping multiple spots)  
+- Rapid lighting transitions (e.g., strong reflections, headlights at night)  
+- Highly dynamic environments with frequent camera movement  
+- Non-standard parking layouts without predefined spot definitions  
 
-Bindings Python
+---
 
-Calibration auto
+### Architectural Trade-offs
 
-Tracking temporel
+- CPU-only execution limits the number of simultaneous camera streams per device  
+- Prioritizing robustness over peak frame-level accuracy may introduce small, stable estimation bias  
+- Manual configuration is currently required for parking layout definition  
 
-## 9. Repository Structure
-smart_parking/
-├── core/
-├── embedded/
-├── bindings/
-├── api/
-└── README.md
+These trade-offs are intentional to preserve computational efficiency, deterministic behavior, and architectural clarity.
 
+## 9. Roadmap / Future Work
 
-👉 Aide énormément à la lecture.
+### V0.0.2 – Robustness & Multi-Camera Foundations
 
-10. Conclusion
+- Crash recovery validation and restart testing  
+- Strengthened state persistence guarantees  
+- Introduction of a `CameraWorker` abstraction  
+- Multi-camera orchestration layer  
+- Clearer separation between API and embedded runtime  
 
-Ce que ce projet démontre
+### Upcoming Extensions
 
-Pourquoi il est intéressant techniquement
+- Automatic camera calibration  
+- Improved temporal tracking  
+- Extended Python bindings  
+- Optional cloud-based monitoring integration  
+
+## 10. Repository Structure
+
+11. Conclusion
