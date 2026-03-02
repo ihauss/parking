@@ -60,8 +60,10 @@ int main(int argc, char** argv){
         parking.evolve(frame);
         
         // Display and/or record the processed frame
-        if(!recordAndDisplay(writer, frame, config))break;
+        if(!recordAndDisplay(frame, config))break;
     }
+
+    stopRecorder();
 
     cout << endl;
     return 0;

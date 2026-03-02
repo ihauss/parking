@@ -70,7 +70,7 @@ This multi-level structure ensures a clear separation between perception, local 
 
 ## 7. Performance Summary
 
-**FPS** : 12 to 14 (Recording make it drop between 9 and 11)
+**FPS** : 12 to 14
 
 **Résolution** : 1080p
 

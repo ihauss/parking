@@ -1,55 +1,94 @@
 #include "smart_parking/utils.h"
 
+// ===============================
+// Async Recorder Globals
+// ===============================
+
+static std::queue<cv::Mat> g_frameQueue;
+static std::mutex g_queueMutex;
+static std::condition_variable g_condition;
+static std::atomic<bool> g_recordingActive(false);
+static std::thread g_writerThread;
+
+// ===============================
+// Recorder Thread Function
+// ===============================
+
+static void writerWorker(cv::VideoWriter* writer)
+{
+    while (g_recordingActive || !g_frameQueue.empty()) {
+
+        std::unique_lock<std::mutex> lock(g_queueMutex);
+        g_condition.wait(lock, [] {
+            return !g_recordingActive || !g_frameQueue.empty();
+        });
+
+        while (!g_frameQueue.empty()) {
+            cv::Mat frame = g_frameQueue.front();
+            g_frameQueue.pop();
+            lock.unlock();
+
+            writer->write(frame);
+
+            lock.lock();
+        }
+    }
+}
+
+// ===============================
+// Argument Parsing
+// ===============================
+
 AppConfig parseArgs(int argc, char** argv) {
     AppConfig config;
 
-    // Parse command-line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
 
         if (arg == "--headless") {
-            config.headless = true;   // Disable display
+            config.headless = true;
         }
         else if (arg == "--rec") {
-            config.record = true;     // Enable video recording
+            config.record = true;
         }
         else if (arg == "--output" && i + 1 < argc) {
-            config.outputPath = argv[++i]; // Output video filename
+            config.outputPath = argv[++i];
         }
         else {
             std::cerr << "Unknown argument: " << arg << std::endl;
         }
     }
 
-    // Debug / runtime configuration summary
     std::cout << "Headless: " << config.headless << std::endl;
     std::cout << "Recording: " << config.record << std::endl;
 
     return config;
 }
 
+// ===============================
+// Capture + Writer Init
+// ===============================
+
 InitStatus getCapAndWriter(cv::VideoCapture& cap,
-                    cv::VideoWriter& writer,
-                    const std::string& videoPath,
-                    const AppConfig& config)
+                           cv::VideoWriter& writer,
+                           const std::string& videoPath,
+                           const AppConfig& config)
 {
     cv::Mat frame;
 
-    // Open input video
     cap.open(videoPath);
     if (!cap.isOpened()) {
         std::cerr << "Error : impossible to open video !" << std::endl;
         return InitStatus::VideoOpenFailed;
     }
 
-    // Read first frame to get video properties
     if (!cap.read(frame))
         return InitStatus::FirstFrameReadFailed;
 
-    // Initialize video writer if recording is enabled
     if (config.record) {
-        int fourcc = cv::VideoWriter::fourcc('a','v','c','1');
-        double fpsVid = 25.0;
+
+        int fourcc = cv::VideoWriter::fourcc('M','J','P','G'); // lighter codec
+        double fpsVid = 14.0; // align with real FPS
 
         cv::Size frameSize(frame.cols, frame.rows);
         std::string outputPath = "output/" + config.outputPath;
@@ -57,7 +96,6 @@ InitStatus getCapAndWriter(cv::VideoCapture& cap,
         namespace fs = std::filesystem;
         const std::string outputDir = "output";
 
-        // Create output directory if needed
         if (!fs::exists(outputDir)) {
             fs::create_directories(outputDir);
             std::cout << "Created output directory: "
@@ -70,28 +108,48 @@ InitStatus getCapAndWriter(cv::VideoCapture& cap,
             std::cerr << "Failed to open video writer" << std::endl;
             return InitStatus::WriterOpenFailed;
         }
+
+        // Start async writer
+        g_recordingActive = true;
+        g_writerThread = std::thread(writerWorker, &writer);
     }
 
     return InitStatus::Success;
 }
 
-bool recordAndDisplay(cv::VideoWriter& writer,
-                      cv::Mat& frame,
+// ===============================
+// Record + Display
+// ===============================
+
+bool recordAndDisplay(cv::Mat& frame,
                       const AppConfig& config)
 {
-    // Write frame to disk if recording
     if (config.record) {
-        writer.write(frame);
+        {
+            std::lock_guard<std::mutex> lock(g_queueMutex);
+            g_frameQueue.push(frame.clone());
+        }
+        g_condition.notify_one();
     }
 
-    // Display frame unless running headless
     if (!config.headless) {
         cv::imshow("Parking view", frame);
-
-        // Exit on ESC key
-        if (cv::waitKey(1) == 27)
+        if (cv::waitKey(1) == 27){
             return false;
+        }
     }
 
     return true;
+}
+
+// ===============================
+// Cleanup function (call before exit)
+// ===============================
+
+void stopRecorder(){
+    g_recordingActive = false;
+    g_condition.notify_all();
+
+    if (g_writerThread.joinable())
+        g_writerThread.join();
 }

@@ -20,6 +20,11 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 #include <filesystem>
+#include <thread>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 /**
  * @brief Status codes returned during video initialization.
@@ -67,7 +72,7 @@ struct AppConfig {
      *
      * Only used when recording is enabled.
      */
-    std::string outputPath = "output.mp4";
+    std::string outputPath = "output.avi";
 };
 
 /**
@@ -123,7 +128,8 @@ InitStatus getCapAndWriter(
  * @return False if the user requested application exit, true otherwise.
  */
 bool recordAndDisplay(
-    cv::VideoWriter& writer,
     cv::Mat& frame,
     const AppConfig& config
 );
+
+void stopRecorder();
