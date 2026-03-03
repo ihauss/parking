@@ -1,7 +1,6 @@
 add_library(smart_parking_core_lib
     src/Parking.cpp
     src/ParkingPlace.cpp
-    src/utils.cpp
     src/LightVision.cpp
     src/HeavyEstimator.cpp
     src/Aligner.cpp

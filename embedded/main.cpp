@@ -14,7 +14,7 @@
 #include <iostream>
 #include <string>
 #include "smart_parking/Parking.h"
-#include "smart_parking/utils.h"
+#include "utils.h"
 
 using namespace std;
 using namespace cv;
