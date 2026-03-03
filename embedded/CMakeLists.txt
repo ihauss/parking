@@ -1,9 +1,10 @@
 add_executable(smart_parking_embedded
     main.cpp
     src/utils.cpp
+    src/Renderer
 )
 
-target_include_directories(smart_parking_core_lib
+target_include_directories(smart_parking_embedded
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

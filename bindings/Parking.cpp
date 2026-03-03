@@ -59,38 +59,36 @@ PYBIND11_MODULE(smart_parking_core, m) {
         )
 
         .def(
-            "get_render_data",
+            "get_render_snapshot",
             [](Parking& self) {
-                const auto& places = self.getRenderData();
-                const ssize_t N = static_cast<ssize_t>(places.size());
+                auto snapshot = self.getRenderSnapshot();
 
-                py::array_t<int> coords(
-                    std::vector<ssize_t>{N, 4, 2}
-                );
-                py::array_t<int> states(
-                    std::vector<ssize_t>{N}
-                );
+                const ssize_t N = static_cast<ssize_t>(snapshot.places.size());
+
+                py::array_t<int> coords({N, 4, 2});
+                py::array_t<int> states({N});
 
                 auto coords_buf = coords.mutable_unchecked<3>();
                 auto states_buf = states.mutable_unchecked<1>();
 
                 for (ssize_t i = 0; i < N; ++i) {
-                    states_buf(i) = static_cast<int>(places[i].state);
+                    states_buf(i) = static_cast<int>(snapshot.places[i].state);
                     for (int j = 0; j < 4; ++j) {
-                        coords_buf(i, j, 0) = places[i].coords[j].x;
-                        coords_buf(i, j, 1) = places[i].coords[j].y;
+                        coords_buf(i, j, 0) = snapshot.places[i].coords[j].x;
+                        coords_buf(i, j, 1) = snapshot.places[i].coords[j].y;
                     }
                 }
 
                 py::dict affine;
-                affine["valid"] = self.hasAffine();
+                affine["valid"] = snapshot.hasAffine;
 
-                if (self.hasAffine()) {
-                    auto A = self.getAffine();
-                    affine["matrix"] = py::array_t<double>({2, 3}, A.data());
+                if (snapshot.hasAffine) {
+                    affine["matrix"] = py::array_t<double>({2, 3}, snapshot.affine.data());
                 }
 
-                return py::make_tuple(coords, states, affine);
+                return py::make_tuple(coords, states, affine,
+                                    snapshot.numOccupied,
+                                    snapshot.numPlaces);
             }
         )
 

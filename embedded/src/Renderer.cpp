@@ -1,4 +1,4 @@
-#include "smart_parking/Renderer.h"
+#include "Renderer.h"
 
 /**
  * @brief Color palette used to render parking places.
@@ -172,30 +172,58 @@ void Renderer::addBanner(
 
 //Main rendering entry point.
 void Renderer::operator()(
-    cv::Mat& frame, 
-    const std::vector<RenderPlace>& places, 
+    const cv::Mat& frame,
     cv::Mat& output,
-    int numOccupied,
-    int numPlace
+    const RenderSnapshot& snapshot
 ){
     if (frame.empty()) {
         Logger::log().error("Renderer::operator() called with empty frame");
         return;
     }
 
-    if (places.empty()) {
-        Logger::log().info("Renderer: no places to render");
+    // --- 1️⃣ Ensure output buffer is valid ---
+    if (output.empty() ||
+        output.size() != frame.size() ||
+        output.type() != frame.type())
+    {
+        output = frame.clone();
+    }
+    else {
+        frame.copyTo(output);
     }
 
-    // Draw parking slots and occupancy status
-    draw(frame, places);
+    // --- 2️⃣ Apply affine alignment if available ---
+    if (snapshot.hasAffine) {
+        cv::Mat affineMat(2, 3, CV_64F,
+                          const_cast<double*>(snapshot.affine.data()));
 
-    // Update FPS estimation
+        cv::Mat warped;
+        cv::warpAffine(
+            output,
+            warped,
+            affineMat,
+            output.size(),
+            cv::INTER_LINEAR,
+            cv::BORDER_CONSTANT
+        );
+
+        warped.copyTo(output);
+    }
+
+    // --- 3️⃣ Draw parking places ---
+    if (!snapshot.places.empty()) {
+        draw(output, snapshot.places);
+    }
+
+    // --- 4️⃣ Update FPS ---
     updateFPS(0.1);
 
-    // Add informational overlay (FPS, statistics, etc.)
-    addBanner(frame, output, numOccupied, numPlace);
+    // --- 5️⃣ Add banner ---
+    cv::Mat bannerOutput;
+    addBanner(output,
+              bannerOutput,
+              snapshot.numOccupied,
+              snapshot.numPlaces);
 
-    // Replace input frame with rendered output
-    frame = output;
-}
+    bannerOutput.copyTo(output);
+};

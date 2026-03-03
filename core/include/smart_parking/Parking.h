@@ -6,12 +6,14 @@
 #include <string>
 #include <fstream>
 #include <chrono>
+#include <stdexcept>
 
 #include "ParkingPlace.h"
 #include "smart_parking/Aligner.h"
 #include "smart_parking/RenderPlace.h"
-#include "smart_parking/Renderer.h"
 #include "smart_parking/Logger.h"
+#include "Frame.h"
+#include "RenderSnapshot.h"
 
 /**
  * @class Parking
@@ -56,11 +58,6 @@ private:
      * to a fixed reference image.
      */
     Aligner _aligner;
-
-    /**
-     * @brief Rendering helper used to generate visualization data.
-     */
-    Renderer _renderer;
 
 public:
     /**
@@ -129,7 +126,7 @@ public:
      *
      * @param frame Current video frame.
      */
-    void evolve(cv::Mat& frame);
+    void evolve(const Frame& frame);
 
     /**
      * @brief Returns rendering data for all parking places.
@@ -144,4 +141,5 @@ public:
 
     bool hasAffine() const;
     std::array<double, 6> getAffine() const;
+    RenderSnapshot getRenderSnapshot() const;
 };

@@ -13,7 +13,11 @@
 #include <chrono>
 #include <iostream>
 #include <string>
+
 #include "smart_parking/Parking.h"
+#include "smart_parking/Frame.h"
+#include "smart_parking/RenderSnapshot.h"
+#include "Renderer.h"
 #include "utils.h"
 
 using namespace std;
@@ -37,7 +41,9 @@ int main(int argc, char** argv){
 
     VideoCapture cap;
     VideoWriter writer;
-    Mat frame;
+    Mat frame, output;
+    Frame engineFrame;
+    Renderer renderer;
 
     // Initialize the parking detection system
     Parking parking("files/coords.json", imread("files/reference.jpg"));
@@ -57,10 +63,16 @@ int main(int argc, char** argv){
         }
 
         // Update parking occupancy state
-        parking.evolve(frame);
+        engineFrame.data = frame;
+        engineFrame.timestamp = std::chrono::steady_clock::now();
+        parking.evolve(engineFrame);
+
+        RenderSnapshot snapshot = parking.getRenderSnapshot();
+
+        renderer(frame, output, snapshot);
         
         // Display and/or record the processed frame
-        if(!recordAndDisplay(frame, config))break;
+        if(!recordAndDisplay(output, config))break;
     }
 
     stopRecorder();

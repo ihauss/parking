@@ -94,7 +94,7 @@ int Parking::getNumOccupied() const {
 
 // Returns number of current FPS
 double Parking::getFps() const {
-    return _renderer.getFps();
+    return 1000.0 / _lastLatencyMs;
 }
 
 // Returns number of current latency
@@ -105,7 +105,7 @@ double Parking::getLastLatencyMs() const {
 // Return system metrics converted to json 
 std::map<std::string, double> Parking::getStats() const {
     return {
-        {"fps", _renderer.getFps()},
+        {"fps", getFps()},
         {"latency_ms", getLastLatencyMs()},
         {"occupied", static_cast<double>(getNumOccupied())},
         {"free", static_cast<double>(getNumPlace() - getNumOccupied())},
@@ -114,20 +114,25 @@ std::map<std::string, double> Parking::getStats() const {
 }
 
 // Updates parking states for a new video frame
-void Parking::evolve(cv::Mat& frame) {
+void Parking::evolve(const Frame& frame){
     auto t0 = std::chrono::steady_clock::now();
 
-    // Align current frame with the reference image
-    cv::Mat output;
-    if (!_aligner(frame, output)) return;
+    if (!frame.isValid()) {
+        throw std::runtime_error("Invalid frame format");
+    }
+
+    const cv::Mat& input = frame.data;
+
+    cv::Mat aligned;
+    if (!_aligner(input, aligned)) {
+        return;
+    }
 
     int newCount = 0;
 
-    // Update state of each parking place
     for (auto& place : _places) {
-        place.changeState(output);
+        place.changeState(aligned);
 
-        // Count occupied and exiting vehicles
         if (place.getState() == PlaceState::OCCUPIED ||
             place.getState() == PlaceState::TRANSITION_OUT)
         {
@@ -135,11 +140,7 @@ void Parking::evolve(cv::Mat& frame) {
         }
     }
 
-    // Update global occupancy count
     _numOccupied = newCount;
-
-    // Render visualization and overlay statistics
-    _renderer(output, getRenderData(), frame, _numOccupied, getNumPlace());
 
     auto t1 = std::chrono::steady_clock::now();
     _lastLatencyMs =
@@ -175,4 +176,19 @@ std::array<double, 6> Parking::getAffine() const {
         A.at<double>(0,0), A.at<double>(0,1), A.at<double>(0,2),
         A.at<double>(1,0), A.at<double>(1,1), A.at<double>(1,2)
     };
+}
+
+RenderSnapshot Parking::getRenderSnapshot() const{
+    RenderSnapshot snapshot;
+    snapshot.places = getRenderData();
+    snapshot.hasAffine = hasAffine();
+
+    if (snapshot.hasAffine) {
+        snapshot.affine = getAffine();
+    }
+
+    snapshot.numOccupied = _numOccupied;
+    snapshot.numPlaces = getNumPlace();
+
+    return snapshot;
 }

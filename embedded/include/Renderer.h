@@ -4,6 +4,7 @@
 
 #include "smart_parking/RenderPlace.h"
 #include "smart_parking/Logger.h"
+#include "smart_parking/RenderSnapshot.h"
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -94,10 +95,8 @@ public:
      * @param numPlace Total number of places.
      */
     void operator()(
-        cv::Mat& frame,
-        const std::vector<RenderPlace>& places,
+        const cv::Mat& frame,
         cv::Mat& output,
-        int numOccupied,
-        int numPlace
+        const RenderSnapshot& snapshot
     );
 };
