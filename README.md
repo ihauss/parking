@@ -11,7 +11,7 @@ The challenge addressed in this project is to reliably estimate parking occupanc
 
 ## Status
 
-V-1.0.0 complete – Core system stabilized
+V-1.1.0 complete – Core system stabilized
 API production-ready
 Deterministic state management
 Dockerized deployment validated
@@ -120,7 +120,7 @@ These trade-offs are intentional to preserve computational efficiency, determini
 
 ## 9. Roadmap / Future Work
 
-### V-1.0.1 – Robustness & Multi-Camera Foundations
+### V-1.2.0 – Robustness & Multi-Camera Foundations
 
 - Crash recovery validation and restart testing  
 - Strengthened state persistence guarantees  
