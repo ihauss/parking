@@ -42,7 +42,7 @@ int main(int argc, char** argv){
     VideoCapture cap;
     VideoWriter writer;
     Mat frame, output;
-    Frame engineFrame;
+    Frame engineFrame(frame);
     Renderer renderer;
 
     // Initialize the parking detection system

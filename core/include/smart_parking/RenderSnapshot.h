@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <array>
-#include "RenderPlace.h"
+#include "smart_parking/RenderPlace.h"
 
 struct RenderSnapshot {
     std::vector<RenderPlace> places;

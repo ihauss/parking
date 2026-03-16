@@ -1,6 +1,6 @@
 pybind11_add_module(
     smart_parking_core
-    Parking.cpp
+    parking_bindings.cpp
 )
 
 target_link_libraries(smart_parking_core

@@ -94,6 +94,9 @@ int Parking::getNumOccupied() const {
 
 // Returns number of current FPS
 double Parking::getFps() const {
+    if (_lastLatencyMs <= 0.0)
+        return 0.0;
+
     return 1000.0 / _lastLatencyMs;
 }
 
@@ -118,8 +121,10 @@ void Parking::evolve(const Frame& frame){
     auto t0 = std::chrono::steady_clock::now();
 
     if (!frame.isValid()) {
+        _state = CameraState::ERROR;
         throw std::runtime_error("Invalid frame format");
     }
+    _state = CameraState::RUNNING;
 
     const cv::Mat& input = frame.data;
 
@@ -191,4 +196,12 @@ RenderSnapshot Parking::getRenderSnapshot() const{
     snapshot.numPlaces = getNumPlace();
 
     return snapshot;
+}
+
+CameraState Parking::getState() const {
+    return _state;
+}
+
+std::string Parking::getStateString() const {
+    return to_string(_state);
 }

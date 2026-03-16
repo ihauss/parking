@@ -8,3 +8,5 @@ dataset_one_class.zip
 smart_parking_env/
 .pytest_cache
 _deps/
+api/data
+restart_test.log

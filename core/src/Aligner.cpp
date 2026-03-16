@@ -25,6 +25,11 @@ bool Aligner::operator()(const cv::Mat& frame, cv::Mat& warped){
     std::vector<uchar> status;
     std::vector<float> err;
 
+    if (_prevPts.empty()) {
+        Logger::log().warn("No tracking points available, skipping alignment.");
+        return false;
+    }
+
     // Track reference points from previous frame to current frame
     cv::calcOpticalFlowPyrLK(
         _prevGray,
@@ -81,7 +86,7 @@ bool Aligner::operator()(const cv::Mat& frame, cv::Mat& warped){
     _prevGray = gray.clone();
 
     // Update tracked points for next optical flow computation
-    _prevPts  = currPts;
+    _prevPts  = src;
 
     return true;
 }

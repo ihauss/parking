@@ -4,6 +4,7 @@ add_library(smart_parking_core_lib
     src/LightVision.cpp
     src/HeavyEstimator.cpp
     src/Aligner.cpp
+    src/ParkingSystem.cpp
 )
 
 set_target_properties(smart_parking_core_lib PROPERTIES

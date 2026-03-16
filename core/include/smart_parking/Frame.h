@@ -12,9 +12,18 @@ struct Frame {
     PixelFormat format{PixelFormat::BGR_UINT8};
     std::chrono::steady_clock::time_point timestamp;
 
+    Frame(const cv::Mat& mat)
+        : data(mat),
+        timestamp(std::chrono::steady_clock::now())
+    {}
+
     bool isValid() const noexcept {
-        return !data.empty()
-               && data.type() == CV_8UC3
-               && data.isContinuous();
+        if (data.empty())
+            return false;
+
+        if (format != PixelFormat::BGR_UINT8)
+            return false;
+
+        return data.type() == CV_8UC3 && data.isContinuous();
     }
 };

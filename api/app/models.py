@@ -1,28 +1,49 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
+from enum import Enum
 
+class CameraMetrics(BaseModel):
+    fps: float
+    latency_ms: float
 
-class ParkingStats(BaseModel):
-    free_places: int
-    occupied_places: int
-    total_places: int
+class GlobalMetrics(BaseModel):
+    camera_count: int
+    healthy: int
+    unhealthy: int
+    avg_fps: float
+    avg_latency_ms: float
 
-
-class RenderPlace(BaseModel):
-    coords: List[List[int]]
+class RenderPlaceModel(BaseModel):
+    coords: list[tuple[int, int]]
     state: int
 
 
-class AffineTransform(BaseModel):
+class AffineTransformModel(BaseModel):
     valid: bool
-    matrix: list[list[float]] | None = None
+    matrix: list[float] | None
 
 
-class RenderResponse(BaseModel):
-    places: list[RenderPlace]
-    transform: AffineTransform
+class SnapshotResponse(BaseModel):
+    places: list[RenderPlaceModel]
+    num_occupied: int
+    num_places: int
+    transform: AffineTransformModel
 
 
-class ParkingMetrics(BaseModel):
-    fps: float
-    last_latency_ms: float
+class ParkingStatsResponse(BaseModel):
+    occupied: int
+    free: int
+    total: int
+
+
+class CameraInfo(BaseModel):
+    id: str
+    healthy: bool
+
+
+class HealthResponse(BaseModel):
+    healthy: bool
+
+class CameraStateResponse(BaseModel):
+    state: str
+    healthy: bool

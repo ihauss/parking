@@ -8,12 +8,13 @@
 #include <chrono>
 #include <stdexcept>
 
-#include "ParkingPlace.h"
+#include "smart_parking/ParkingPlace.h"
 #include "smart_parking/Aligner.h"
 #include "smart_parking/RenderPlace.h"
 #include "smart_parking/Logger.h"
-#include "Frame.h"
-#include "RenderSnapshot.h"
+#include "smart_parking/Frame.h"
+#include "smart_parking/RenderSnapshot.h"
+#include "smart_parking/CameraState.h"
 
 /**
  * @class Parking
@@ -58,6 +59,8 @@ private:
      * to a fixed reference image.
      */
     Aligner _aligner;
+
+    CameraState _state{CameraState::IDLE};
 
 public:
     /**
@@ -142,4 +145,6 @@ public:
     bool hasAffine() const;
     std::array<double, 6> getAffine() const;
     RenderSnapshot getRenderSnapshot() const;
+    CameraState getState() const;
+    std::string getStateString() const;
 };
