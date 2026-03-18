@@ -1,5 +1,13 @@
+"""
+Camera management API.
+
+Provides:
+- Camera lifecycle management (add, remove, restart)
+- Health and state monitoring
+- Persistent storage on disk
+"""
+
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
 from pathlib import Path
 import shutil
 import json
@@ -7,9 +15,15 @@ import re
 import cv2
 import numpy as np
 import time
+
 from app.models import CameraInfo, HealthResponse, CameraStateResponse
 
+
 router = APIRouter()
+
+MAX_CONFIG_SIZE = 1 * 1024 * 1024
+MAX_IMAGE_SIZE = 5 * 1024 * 1024
+
 
 # =========================
 # Constants
@@ -22,7 +36,7 @@ ID_REGEX = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 # =========================
-# Utility Functions
+# Utilities
 # =========================
 
 def ensure_directories():
@@ -31,10 +45,7 @@ def ensure_directories():
 
 def validate_camera_id(camera_id: str):
     if not ID_REGEX.match(camera_id):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid camera_id format"
-        )
+        raise HTTPException(400, "Invalid camera_id format")
 
 
 def load_reference_image(path: Path):
@@ -42,49 +53,6 @@ def load_reference_image(path: Path):
     if img is None:
         raise ValueError("Invalid reference image")
     return img
-
-
-# =========================
-# Startup Reload Helper
-# =========================
-
-def reload_cameras_from_disk(app):
-    logger = app.state.logger
-    parking_system = app.state.parking_system
-
-    ensure_directories()
-
-    for camera_folder in CAMERAS_DIR.iterdir():
-        if not camera_folder.is_dir():
-            continue
-
-        camera_id = camera_folder.name
-        config_path = camera_folder / "config.json"
-        reference_path = camera_folder / "reference.jpg"
-
-        if not config_path.exists() or not reference_path.exists():
-            logger.warning(
-                "Skipping incomplete camera folder: %s",
-                camera_id
-            )
-            continue
-
-        try:
-            reference = load_reference_image(reference_path)
-
-            parking_system.add_camera(
-                camera_id,
-                str(config_path),
-                reference
-            )
-
-            logger.info("Loaded camera from disk: %s", camera_id)
-
-        except Exception:
-            logger.exception(
-                "Failed to load camera %s at startup",
-                camera_id
-            )
 
 
 # =========================
@@ -98,64 +66,80 @@ async def add_camera(
     config: UploadFile = File(...),
     reference: UploadFile = File(...)
 ):
+    """
+    Register a new camera with configuration and reference image.
+    """
     logger = request.app.state.logger
     parking_system = request.app.state.parking_system
-    frame_dispatcher = request.app.state.frame_dispatcher
+    dispatcher = request.app.state.frame_dispatcher
     start_time = time.perf_counter()
 
-    validate_camera_id(camera_id)
+    if parking_system is None:
+        logger.error("Parking system not initialized")
+        raise HTTPException(503, "Parking system not initialized")
 
+    if dispatcher is None:
+        logger.error("Frame dispatcher not initialized")
+        raise HTTPException(503, "Frame dispatcher not initialized")
+
+    validate_camera_id(camera_id)
     ensure_directories()
 
     camera_dir = CAMERAS_DIR / camera_id
 
     if camera_dir.exists():
-        raise HTTPException(
-            status_code=409,
-            detail="Camera already exists"
-        )
+        raise HTTPException(409, "Camera already exists")
 
     try:
-        # Create directory
         camera_dir.mkdir(parents=True)
 
-        # Save config
-        config_path = camera_dir / "config.json"
+        # =========================
+        # Config
+        # =========================
+
         config_bytes = await config.read()
+
+        if len(config_bytes) > MAX_CONFIG_SIZE:
+            raise HTTPException(400, "Config too large")
 
         try:
             json.loads(config_bytes.decode())
         except Exception:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid JSON configuration"
-            )
+            raise HTTPException(400, "Invalid JSON configuration")
 
-        with open(config_path, "wb") as f:
-            f.write(config_bytes)
+        config_path = camera_dir / "config.json"
+        config_path.write_bytes(config_bytes)
 
-        # Save reference
-        reference_path = camera_dir / "reference.jpg"
+        # =========================
+        # Reference image
+        # =========================
+
         reference_bytes = await reference.read()
 
-        with open(reference_path, "wb") as f:
-            f.write(reference_bytes)
+        if len(reference_bytes) > MAX_IMAGE_SIZE:
+            raise HTTPException(400, "Reference image too large")
 
-        # Validate reference image
+        reference_path = camera_dir / "reference.jpg"
+        reference_path.write_bytes(reference_bytes)
+
         reference_img = load_reference_image(reference_path)
 
-        # Add to C++ system
+        # =========================
+        # Register camera
+        # =========================
+
         parking_system.add_camera(
             camera_id,
             str(config_path),
             reference_img
         )
 
-        frame_dispatcher.add_camera(camera_id)
+        dispatcher.add_camera(camera_id)
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
+
         logger.info(
-            "Camera %s added successfully | %.2f ms",
+            "camera %s created | %.2f ms",
             camera_id,
             elapsed_ms
         )
@@ -167,12 +151,9 @@ async def add_camera(
         raise
 
     except Exception:
-        logger.exception("Failed to create camera %s", camera_id)
+        logger.exception("camera %s creation failed", camera_id)
         shutil.rmtree(camera_dir, ignore_errors=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error"
-        )
+        raise HTTPException(500, "Internal server error")
 
 
 # =========================
@@ -181,9 +162,20 @@ async def add_camera(
 
 @router.delete("/cameras/{camera_id}", status_code=204)
 def remove_camera(camera_id: str, request: Request):
+    """
+    Remove a camera and its associated data.
+    """
     logger = request.app.state.logger
     parking_system = request.app.state.parking_system
-    frame_dispatcher = request.app.state.frame_dispatcher
+    dispatcher = request.app.state.frame_dispatcher
+
+    if parking_system is None:
+        logger.error("Parking system not initialized")
+        raise HTTPException(503, "Parking system not initialized")
+
+    if dispatcher is None:
+        logger.error("Frame dispatcher not initialized")
+        raise HTTPException(503, "Frame dispatcher not initialized")
 
     validate_camera_id(camera_id)
 
@@ -191,19 +183,18 @@ def remove_camera(camera_id: str, request: Request):
 
     try:
         parking_system.remove_camera(camera_id)
-        frame_dispatcher.remove_camera(camera_id)
+        dispatcher.remove_camera(camera_id)
 
     except RuntimeError:
-        raise HTTPException(status_code=404, detail="Camera not found")
+        raise HTTPException(404, "Camera not found")
 
     except Exception:
-        logger.exception("Unexpected error removing camera")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.exception("camera %s removal failed", camera_id)
+        raise HTTPException(500, "Internal server error")
 
-    # Remove directory
     shutil.rmtree(camera_dir, ignore_errors=True)
 
-    logger.info("Camera %s removed", camera_id)
+    logger.info("camera %s removed", camera_id)
 
 
 # =========================
@@ -212,17 +203,25 @@ def remove_camera(camera_id: str, request: Request):
 
 @router.post("/cameras/{camera_id}/restart")
 def restart_camera(camera_id: str, request: Request):
+    """
+    Restart a camera using persisted configuration.
+    """
     logger = request.app.state.logger
     parking_system = request.app.state.parking_system
+
+    if parking_system is None:
+        logger.error("Parking system not initialized")
+        raise HTTPException(503, "Parking system not initialized")
 
     validate_camera_id(camera_id)
 
     camera_dir = CAMERAS_DIR / camera_id
-    config_path = camera_dir / "config.json"
-    reference_path = camera_dir / "reference.jpg"
 
     if not camera_dir.exists():
-        raise HTTPException(status_code=404, detail="Camera not found")
+        raise HTTPException(404, "Camera not found")
+
+    config_path = camera_dir / "config.json"
+    reference_path = camera_dir / "reference.jpg"
 
     try:
         reference_img = load_reference_image(reference_path)
@@ -233,16 +232,16 @@ def restart_camera(camera_id: str, request: Request):
             reference_img
         )
 
-        logger.info("Camera %s restarted", camera_id)
+        logger.info("camera %s restarted", camera_id)
 
         return {"detail": "Camera restarted"}
 
     except RuntimeError:
-        raise HTTPException(status_code=404, detail="Camera not found")
+        raise HTTPException(404, "Camera not found")
 
     except Exception:
-        logger.exception("Unexpected error restarting camera")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.exception("camera %s restart failed", camera_id)
+        raise HTTPException(500, "Internal server error")
 
 
 # =========================
@@ -251,17 +250,30 @@ def restart_camera(camera_id: str, request: Request):
 
 @router.get("/cameras", response_model=list[CameraInfo])
 def list_cameras(request: Request):
+    """
+    List all registered cameras.
+    """
     parking_system = request.app.state.parking_system
+    logger = request.app.state.logger
 
-    ids = parking_system.list_cameras()
+    if parking_system is None:
+        logger.error("Parking system not initialized")
+        raise HTTPException(503, "Parking system not initialized")
 
-    return [
-        CameraInfo(
-            id=camera_id,
-            healthy=parking_system.is_healthy(camera_id)
-        )
-        for camera_id in ids
-    ]
+    try:
+        ids = parking_system.list_cameras()
+
+        return [
+            CameraInfo(
+                id=camera_id,
+                healthy=parking_system.is_healthy(camera_id)
+            )
+            for camera_id in ids
+        ]
+
+    except Exception:
+        logger.exception("list cameras failed")
+        raise HTTPException(500, "Internal server error")
 
 
 # =========================
@@ -270,23 +282,46 @@ def list_cameras(request: Request):
 
 @router.get("/cameras/{camera_id}/health", response_model=HealthResponse)
 def camera_health(camera_id: str, request: Request):
+    """
+    Get camera health status.
+    """
     parking_system = request.app.state.parking_system
+    logger = request.app.state.logger
+
+    if parking_system is None:
+        logger.error("Parking system not initialized")
+        raise HTTPException(503, "Parking system not initialized")
 
     try:
-        healthy = parking_system.is_healthy(camera_id)
-        return HealthResponse(healthy=healthy)
+        return HealthResponse(
+            healthy=parking_system.is_healthy(camera_id)
+        )
 
     except RuntimeError:
-        raise HTTPException(status_code=404, detail="Camera not found")
-    
+        raise HTTPException(404, "Camera not found")
+
+
+# =========================
+# GET - Camera State
+# =========================
+
 @router.get("/cameras/{camera_id}/state", response_model=CameraStateResponse)
-def state_str(camera_id: str, request: Request):
+def camera_state(camera_id: str, request: Request):
+    """
+    Get camera runtime state.
+    """
     parking_system = request.app.state.parking_system
+    logger = request.app.state.logger
+
+    if parking_system is None:
+        logger.error("Parking system not initialized")
+        raise HTTPException(503, "Parking system not initialized")
 
     try:
-        state_str = parking_system.get_cam_state_str(camera_id)
-        healthy = parking_system.is_healthy(camera_id)
-        return CameraStateResponse(state=state_str, healthy=healthy)
+        return CameraStateResponse(
+            state=parking_system.get_cam_state_str(camera_id),
+            healthy=parking_system.is_healthy(camera_id)
+        )
 
     except RuntimeError:
-        raise HTTPException(status_code=404, detail="Camera not found")
+        raise HTTPException(404, "Camera not found")

@@ -1,10 +1,10 @@
 """
-Global application state.
+Global application runtime state.
 
-Hosts:
-- Parking core instance (C++ binding)
-- Initialization status
-- Persistent camera reload at startup
+Responsibilities:
+- Manage initialization of core services (ParkingSystem, dispatcher, watchdog)
+- Maintain application-wide state
+- Reload persisted cameras at startup
 """
 
 from pathlib import Path
@@ -24,6 +24,15 @@ CAMERAS_DIR = DATA_DIR / "cameras"
 
 
 class Runtime:
+    """
+    Central runtime manager for the application.
+
+    Handles:
+    - Initialization of core components
+    - Lifecycle state (initialized / not initialized)
+    - Camera reloading from disk
+    """
+
     def __init__(self):
         self.initialized: bool = False
 
@@ -31,42 +40,61 @@ class Runtime:
     # Initialization
     # =========================
 
-    def initialize(self, app, start_watchdog=True):
+    def initialize(self, app, start_watchdog: bool = True):
         """
-        Initialize core services.
-        Called at FastAPI startup.
+        Initialize all core services.
+
+        This method is called at FastAPI startup and ensures that:
+        - ParkingSystem is created
+        - FrameDispatcher is started
+        - Watchdog is optionally started
+        - Cameras are reloaded from disk
+
+        Args:
+            app: FastAPI application instance
+            start_watchdog (bool): Whether to start the watchdog task
         """
         if self.initialized:
             return
-        
-        app.state.logger = setup_logger(level="INFO")
 
-        app.state.logger.info("Initializing ParkingSystem...")
+        # Setup logger
+        app.state.logger = setup_logger(level=logging.INFO)
+        logger = app.state.logger
 
+        logger.info("Initializing parking system...")
+
+        # Initialize core system
         parking_system = ParkingSystem()
         app.state.parking_system = parking_system
 
-        app.state.watchdog = CameraWatchdog(
-            app.state.parking_system,
-            app.state.logger
-        )
-
+        # Initialize dispatcher (frame processing)
         app.state.frame_dispatcher = FrameDispatcher(parking_system)
         app.state.frame_dispatcher.start()
+
+        # Initialize watchdog (camera health monitoring)
+        app.state.watchdog = CameraWatchdog(
+            parking_system,
+            logger
+        )
 
         if start_watchdog:
             try:
                 loop = asyncio.get_running_loop()
-                app.state.watchdog_task = loop.create_task(app.state.watchdog.run())
-                app.state.logger.info("Watchdog started")
+                app.state.watchdog_task = loop.create_task(
+                    app.state.watchdog.run()
+                )
+                logger.info("Watchdog started")
+
             except RuntimeError:
-                app.state.logger.info("Watchdog not started (no running event loop)")
+                logger.warning(
+                    "Watchdog not started (no running event loop)"
+                )
                 app.state.watchdog_task = None
         else:
-            app.state.logger.info("Watchdog disabled")
+            logger.info("Watchdog disabled")
             app.state.watchdog_task = None
 
-        # Ensure folders exist
+        # Ensure required directories exist
         CAMERAS_DIR.mkdir(parents=True, exist_ok=True)
 
         # Reload cameras from disk
@@ -74,7 +102,7 @@ class Runtime:
 
         self.initialized = True
 
-        app.state.logger.info("Application initialized successfully.")
+        logger.info("Application initialized successfully")
 
     # =========================
     # Internal Reload Logic
@@ -82,10 +110,22 @@ class Runtime:
 
     def _reload_cameras(self, app):
         """
-        Reload all cameras found in data/cameras/.
-        Skips invalid or corrupted folders.
+        Reload all persisted cameras from disk.
+
+        Expected structure:
+            data/cameras/<camera_id>/
+                - config.json
+                - reference.jpg
+
+        Invalid or incomplete camera folders are skipped.
+
+        Args:
+            app: FastAPI application instance
         """
-        assert app.state.parking_system is not None
+        parking_system = app.state.parking_system
+        logger = app.state.logger
+
+        assert parking_system is not None
 
         loaded = 0
         skipped = 0
@@ -99,8 +139,9 @@ class Runtime:
             config_path = camera_dir / "config.json"
             reference_path = camera_dir / "reference.jpg"
 
+            # Validate required files
             if not config_path.exists() or not reference_path.exists():
-                app.state.logger.warning(
+                logger.warning(
                     "Skipping incomplete camera folder: %s",
                     camera_id
                 )
@@ -108,17 +149,19 @@ class Runtime:
                 continue
 
             try:
+                # Load reference image
                 reference = cv2.imread(str(reference_path))
                 if reference is None:
                     raise ValueError("Invalid reference image")
 
-                app.state.parking_system.add_camera(
+                # Register camera in core system
+                parking_system.add_camera(
                     camera_id,
                     str(config_path),
                     reference
                 )
 
-                app.state.logger.info(
+                logger.info(
                     "Camera reloaded successfully: %s",
                     camera_id
                 )
@@ -126,13 +169,13 @@ class Runtime:
                 loaded += 1
 
             except Exception:
-                app.state.logger.exception(
+                logger.exception(
                     "Failed to reload camera: %s",
                     camera_id
                 )
                 skipped += 1
 
-        app.state.logger.info(
+        logger.info(
             "Camera reload complete | loaded=%d | skipped=%d",
             loaded,
             skipped

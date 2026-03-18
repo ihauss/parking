@@ -130,7 +130,7 @@ PYBIND11_MODULE(smart_parking_core, m) {
 
         .def("get_snapshot", &ParkingSystem::getSnapshot)
 
-        .def("get_cam_state_str", &ParkingSystem::getStateString);
+        .def("get_cam_state_str", &ParkingSystem::getStateString)
 
-        .def("get_last_update_seconds", &ParkingSystem::getLastUpdateSeconds)
+        .def("get_last_update_seconds", &ParkingSystem::getLastUpdateSeconds);
 }

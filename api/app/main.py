@@ -1,35 +1,42 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+import logging
 
 from app.routers import parking, metrics, system
 from app.logger import setup_logger
 from app.runtime import runtime
 
 
-from smart_parking_core import ParkingSystem
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Application lifecycle manager.
+
+    Handles:
+    - Startup initialization of core services
+    - Graceful shutdown of background components
+
+    Ensures the ParkingSystem and related services are properly
+    initialized before serving requests and cleanly stopped on exit.
+    """
 
     # =========================
     # Startup
     # =========================
 
-    logger = setup_logger(level="INFO")
+    logger = setup_logger(level=logging.INFO)
     logger.info("Application starting")
 
     try:
-        # Instantiate core system (no cameras yet)
+        # Initialize runtime (ParkingSystem, dispatcher, etc.)
         runtime.initialize(app)
-        logger.info("ParkingSystem initialized")
 
-        logger.info("ParkingSystem initialized (no cameras loaded)")
+        logger.info("Parking system initialized (no cameras loaded)")
 
-    except Exception as e:
-        logger.exception("Failed to initialize ParkingSystem")
+    except Exception:
+        logger.exception("Failed to initialize parking system")
         runtime.initialized = False
-        raise e
+        raise
 
     yield
 
@@ -39,10 +46,25 @@ async def lifespan(app: FastAPI):
 
     logger.info("Application shutting down")
 
-    app.state.watchdog.running = False
-    await app.state.watchdog_task
-    app.state.parking_system = None
-    runtime.initialized = False
+    try:
+        # Stop watchdog safely if present
+        watchdog = getattr(app.state, "watchdog", None)
+        watchdog_task = getattr(app.state, "watchdog_task", None)
+
+        if watchdog is not None:
+            watchdog.running = False
+
+        if watchdog_task is not None:
+            await watchdog_task
+
+        # Cleanup core system
+        app.state.parking_system = None
+        runtime.initialized = False
+
+        logger.info("Shutdown completed")
+
+    except Exception:
+        logger.exception("Error during shutdown")
 
 
 app = FastAPI(

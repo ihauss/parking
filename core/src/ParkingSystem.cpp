@@ -212,8 +212,25 @@ ParkingSystem::getLastUpdate(const std::string& id) const {
 }
 
 double ParkingSystem::getLastUpdateSeconds(const std::string& id) const {
-    auto ctx = getCameraContext(id);
+    std::shared_ptr<CameraContext> ctx;
+
+    // 🔒 Accès map cameras protégé
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        auto it = _cameras.find(id);
+        if (it == _cameras.end())
+            throw std::runtime_error("Camera not found");
+        ctx = it->second;
+    }
+
+    // 🔒 Accès au contexte caméra protégé
+    std::chrono::steady_clock::time_point lastUpdate;
+    {
+        std::lock_guard<std::mutex> camLock(ctx->mutex);
+        lastUpdate = ctx->lastUpdate;
+    }
+
     auto now = std::chrono::steady_clock::now();
 
-    return std::chrono::duration<double>(now - ctx->lastUpdate).count();
+    return std::chrono::duration<double>(now - lastUpdate).count();
 }
