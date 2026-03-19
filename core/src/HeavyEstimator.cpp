@@ -1,95 +1,84 @@
 #include "smart_parking/HeavyEstimator.h"
 
-// Default constructor
-HeavyEstimator::HeavyEstimator(){}
+namespace smart_parking {
 
-// Applies a perspective warp to normalize the parking place region
-cv::Mat HeavyEstimator::wrap(const cv::Mat& frame, const std::array<cv::Point, 4>& coords){
-    // Estimate warped image width using top edge length
-    float W = static_cast<int>(cv::norm(coords[0] - coords[1]));
+HeavyEstimator::HeavyEstimator() {}
 
-    // Estimate warped image height using left edge length
-    float H = static_cast<int>(cv::norm(coords[0] - coords[3]));
+cv::Mat HeavyEstimator::warp(const cv::Mat& frame,
+                             const std::array<cv::Point, 4>& coords) const
+{
+    if (frame.empty()) {
+        Logger::log().error("HeavyEstimator::warp - empty frame");
+        return {};
+    }
+
+    float widthA = cv::norm(coords[2] - coords[3]);
+    float widthB = cv::norm(coords[1] - coords[0]);
+    float W = std::max(widthA, widthB);
+
+    float heightA = cv::norm(coords[1] - coords[2]);
+    float heightB = cv::norm(coords[0] - coords[3]);
+    float H = std::max(heightA, heightB);
 
     if (W < 5 || H < 5) {
-        Logger::log().error("HeavyEstimator::wrap - invalid warp size");
-        return cv::Mat();
+        Logger::log().error("HeavyEstimator::warp - invalid size");
+        return {};
     }
 
-    // Source points: original parking polygon corners
-    std::vector<cv::Point2f> srcPts = {
-        cv::Point2f(coords[0]),
-        cv::Point2f(coords[1]),
-        cv::Point2f(coords[2]),
-        cv::Point2f(coords[3])
-    };
+    std::vector<cv::Point2f> srcPts(coords.begin(), coords.end());
 
-    // Destination points: normalized rectangular space
     std::vector<cv::Point2f> dstPts = {
         {0.f, 0.f},
-        {static_cast<float>(W - 1), 0.f},
-        {static_cast<float>(W - 1), static_cast<float>(H - 1)},
-        {0.f, static_cast<float>(H - 1)}
+        {W - 1, 0.f},
+        {W - 1, H - 1},
+        {0.f, H - 1}
     };
 
-    // Compute perspective transformation matrix
     cv::Mat h = cv::getPerspectiveTransform(srcPts, dstPts);
     if (h.empty()) {
-        Logger::log().error("HeavyEstimator::wrap - perspective transform failed");
-        return cv::Mat();
+        Logger::log().error("HeavyEstimator::warp failed");
+        return {};
     }
 
-    // Output warped image
     cv::Mat warped;
-
-    // Apply perspective warp to extract normalized parking region
-    cv::warpPerspective(
-        frame,
-        warped,
-        h,
-        cv::Size(W, H),
-        cv::INTER_LINEAR,
-        cv::BORDER_CONSTANT
-    );
+    cv::warpPerspective(frame, warped, h, cv::Size(W, H));
 
     return warped;
 }
 
-// Estimates occupancy based on luminance variance
-bool HeavyEstimator::isOccupied(const cv::Mat& wraped){
-    // Convert normalized region to YCrCb color space
-    cv::Mat ycrcb;
-    cv::cvtColor(wraped, ycrcb, cv::COLOR_BGR2YCrCb);
+bool HeavyEstimator::isOccupied(const cv::Mat& warped) const
+{
+    if (warped.empty()) return false;
 
-    // Split YCrCb channels
+    cv::Mat ycrcb;
+    cv::cvtColor(warped, ycrcb, cv::COLOR_BGR2YCrCb);
+
     std::vector<cv::Mat> channels;
     cv::split(ycrcb, channels);
 
-    // Extract luminance (Y) channel
     cv::Mat Y = channels[0];
 
-    // Compute mean and standard deviation of luminance
+    cv::GaussianBlur(Y, Y, cv::Size(5,5), 0);
+
     cv::Scalar mean, stddev;
     cv::meanStdDev(Y, mean, stddev);
 
-    // Variance of luminance used as texture indicator
     double varianceY = stddev[0] * stddev[0];
 
-    // High variance indicates presence of a vehicle
-    if(varianceY > 1500) return true;
-
-    return false;
+    return varianceY > 1500;
 }
 
-// Full occupancy estimation pipeline
-bool HeavyEstimator::operator()(const cv::Mat& frame, const std::array<cv::Point, 4>& coords){
-    // Normalize parking region geometry
-    cv::Mat wrapped = wrap(frame, coords);
-    if (wrapped.empty()) {
-        Logger::log().warn("HeavyEstimator failed to warp parking region");
-        return true; // conservative default
+bool HeavyEstimator::operator()(const cv::Mat& frame,
+                                const std::array<cv::Point, 4>& coords) const
+{
+    cv::Mat warped = warp(frame, coords);
+
+    if (warped.empty()) {
+        Logger::log().warn("HeavyEstimator warp failed");
+        return false;
     }
 
-    // Infer occupancy from appearance statistics
-    return isOccupied(wrapped);
+    return isOccupied(warped);
 }
+
+} // namespace smart_parking

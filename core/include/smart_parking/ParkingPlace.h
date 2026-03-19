@@ -10,6 +10,8 @@
 #include "smart_parking/PlaceState.h"
 #include "smart_parking/Logger.h"
 
+namespace smart_parking {
+
 /**
  * @class ParkingPlace
  * @brief Represents a single parking slot and manages its occupancy state.
@@ -27,6 +29,10 @@
  *
  * Heavy computations are executed asynchronously to avoid blocking
  * the main processing loop.
+ *
+ * Threading:
+ * - This class uses std::future for async heavy estimation.
+ * - It is NOT thread-safe and must be used from a single thread.
  */
 class ParkingPlace {
 private:
@@ -63,9 +69,9 @@ private:
     /**
      * @brief Asynchronous result of a heavy occupancy estimation.
      *
-     * The future is launched during transitions and collected later.
+     * Must always be checked with .valid() before use.
      */
-    std::future<bool> _occupancyResultAsc;
+    std::future<bool> _occupancyResultAsync;
 
     /**
      * @brief Cached result of the last completed heavy estimation.
@@ -110,11 +116,12 @@ public:
      *  - LightVisionData (motion signal),
      *  - optional HeavyEstimator result (occupancy confirmation).
      *
-     * @param data Output of LightVision.
+     * @param data Output of LightVision (read-only).
      * @param info Optional heavy estimation result.
      * @return True if the state changed.
      */
-    bool update(LightVisionData& data, std::optional<bool> info);
+    bool update(const LightVisionData& data,
+                std::optional<bool> info);
 
     /**
      * @brief Ensures parking coordinates stay inside frame boundaries.
@@ -125,7 +132,7 @@ public:
      * @param frameSize Size of the current video frame.
      * @return True if any coordinate was modified.
      */
-    bool adjustCoords(cv::Size& frameSize);
+    bool adjustCoords(const cv::Size& frameSize);
 
     /**
      * @brief Returns the current parking place state.
@@ -135,9 +142,9 @@ public:
     /**
      * @brief Returns the polygon defining the parking place.
      *
-     * @return Array of four cv::Point.
+     * @return Reference to array of four cv::Point.
      */
-    const std::array<cv::Point, 4> getCoords() const;
+    const std::array<cv::Point, 4>& getCoords() const;
 
     /**
      * @brief Main update entry point called for each new frame.
@@ -147,7 +154,9 @@ public:
      *  - launches heavy estimations asynchronously when needed,
      *  - updates the internal state machine accordingly.
      *
-     * @param frame Current video frame.
+     * @param frame Current video frame (read-only).
      */
-    void changeState(cv::Mat& frame);
+    void changeState(const cv::Mat& frame);
 };
+
+} // namespace smart_parking

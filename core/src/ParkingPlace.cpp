@@ -2,6 +2,8 @@
 
 using namespace std::chrono_literals;
 
+namespace smart_parking {
+
 // Constructor: initialize parking place with coordinates and unique ID
 ParkingPlace::ParkingPlace(const std::array<cv::Point, 4> coords, int id)
     : _id(id), _currentState(PlaceState::INIT_STATE)
@@ -18,20 +20,27 @@ PlaceState ParkingPlace::getState() const{
 }
 
 // Checks if the last heavy estimation is still within cooldown window
-bool ParkingPlace::isRecent(std::chrono::steady_clock::time_point timestamp, std::chrono::milliseconds coolDownTime){
-    bool recent = timestamp - _lastEstimationTime < coolDownTime;
-    return recent;
+bool ParkingPlace::isRecent(std::chrono::steady_clock::time_point timestamp,
+                           std::chrono::milliseconds coolDownTime){
+    if (_lastEstimationTime.time_since_epoch().count() == 0)
+        return false;
+
+    return (timestamp - _lastEstimationTime) < coolDownTime;
 }
 
 // FSM update logic
 // Returns true if a heavy estimation is required
-bool ParkingPlace::update(LightVisionData& data, std::optional<bool> info){
+bool ParkingPlace::update(const LightVisionData& data, std::optional<bool> info){
 
     // If heavy estimator returned a result, update state immediately
-    if(info.has_value()){
-        if(*info)_currentState = PlaceState::OCCUPIED;
-        else _currentState = PlaceState::FREE;
+    if (info.has_value()) {
+        if (*info)
+            _currentState = PlaceState::OCCUPIED;
+        else
+            _currentState = PlaceState::FREE;
+
         _lastEstimationTime = data.timestamp;
+        return false;
     }
 
     // Prevent too frequent heavy estimations
@@ -63,12 +72,12 @@ bool ParkingPlace::update(LightVisionData& data, std::optional<bool> info){
 }
 
 // Returns quadrilateral coordinates
-const std::array<cv::Point, 4> ParkingPlace::getCoords() const {
+const std::array<cv::Point, 4>& ParkingPlace::getCoords() const {
     return _coords;
 }
 
 // Ensures coordinates stay inside frame boundaries
-bool ParkingPlace::adjustCoords(cv::Size& frameSize)
+bool ParkingPlace::adjustCoords(const cv::Size& frameSize)
 {
     bool modified = false;
 
@@ -96,11 +105,11 @@ bool ParkingPlace::adjustCoords(cv::Size& frameSize)
 }
 
 // Main state evolution per frame
-void ParkingPlace::changeState(cv::Mat& frame) {
+void ParkingPlace::changeState(const cv::Mat& frame) {
 
     // If asynchronous heavy estimation finished → retrieve result
-    if (_occupancyResultAsc.valid() && _occupancyResultAsc.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            _occupancyResult = _occupancyResultAsc.get();
+    if (_occupancyResultAsync.valid() && _occupancyResultAsync.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            _occupancyResult = _occupancyResultAsync.get();
     }
 
     // Ensure coordinates are valid
@@ -115,21 +124,28 @@ void ParkingPlace::changeState(cv::Mat& frame) {
 
     // Launch heavy estimator asynchronously if needed
     if(needHeavyEstimation){
-        _occupancyResultAsc = std::async(std::launch::async,
-            [this, frame]() mutable {
+        auto coordsCopy = _coords;
+        auto frameCopy = frame.clone();
+
+        _occupancyResultAsync = std::async(std::launch::async,
+            [this, frameCopy, coordsCopy]() {
                 try {
-                    return _estimator(frame, _coords);
+                    return _estimator(frameCopy, coordsCopy);
                 } catch (const std::exception& e) {
                     Logger::log().error(
                         "ParkingPlace " + std::to_string(_id) +
                         " heavy estimator failed: " + e.what()
                     );
-                    throw;
+                    return true; // fallback safe
                 }
             }
         );
     }
 
     // Reset last heavy result to avoid reusing stale data
-    _occupancyResult.reset();
+    if (_occupancyResult.has_value()) {
+        _occupancyResult.reset();
+    }
 }
+
+} // namespace smart_parking

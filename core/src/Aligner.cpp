@@ -1,11 +1,10 @@
 #include "smart_parking/Aligner.h"
 
-// Constructor: initializes the aligner with a reference frame
-Aligner::Aligner(cv::Mat reference){
-    // Store reference image used as alignment target
-    _reference = reference;
+namespace smart_parking {
 
-    // Initialize reference features and optical flow state
+// Constructor: initializes the aligner with a reference frame
+Aligner::Aligner(const cv::Mat& reference)
+    : _reference(reference.clone()) {
     initReference();
     Logger::log().info("Aligner initialized with reference frame");
 }
@@ -56,33 +55,37 @@ bool Aligner::operator()(const cv::Mat& frame, cv::Mat& warped){
     }
 
     // Abort if not enough valid correspondences are available
-    if (src.size() < 10)
+    if (src.size() < 10) {
+        Logger::log().warn("Too few tracked points, reinitializing reference");
+        initReference();
         return false;
+    }
 
-    // Container for inlier mask produced by RANSAC
     std::vector<uchar> inliers;
+    cv::Mat A = cv::estimateAffinePartial2D(src, dst, inliers, cv::RANSAC);
 
-    // Estimate affine transform from current frame to reference frame
-    cv::Mat A = cv::estimateAffinePartial2D(
-        src,
-        dst,
-        inliers,
-        cv::RANSAC
-    );
-
-    // Abort if affine estimation failed
     if (A.empty()) {
         _affineValid = false;
         return false;
     }
 
+    // Filter with inliers
+    std::vector<cv::Point2f> filteredPrev, filteredRef;
+
+    for (size_t i = 0; i < inliers.size(); ++i) {
+        if (inliers[i]) {
+            filteredPrev.push_back(src[i]);
+            filteredRef.push_back(dst[i]);
+        }
+    }
+
+    _prevPts = filteredPrev;
+    _refPts  = filteredRef;
+
     _lastAffine = A.clone();
     _affineValid = true;
 
-    // Warp the current frame into reference coordinate space
     cv::warpAffine(frame, warped, A, _reference.size());
-
-    // Update previous grayscale frame for next iteration
     _prevGray = gray.clone();
 
     // Update tracked points for next optical flow computation
@@ -126,10 +129,12 @@ void Aligner::initReference()
     }
 }
 
-bool Aligner::hasAffine() const {
+bool Aligner::hasAffine() const noexcept {
     return _affineValid;
 }
 
 cv::Mat Aligner::getAffine() const {
     return _lastAffine;
 }
+
+} // namespace smart_parking

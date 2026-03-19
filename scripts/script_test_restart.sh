@@ -22,7 +22,15 @@ uvicorn app.main:app > restart_test.log 2>&1 &
 API_PID=$!
 cd ..
 
-sleep 3
+echo "Waiting for API to be ready..."
+
+for i in {1..20}; do
+    if curl -s "$API_URL/docs" > /dev/null; then
+        echo "API is ready"
+        break
+    fi
+    sleep 0.5
+done
 
 echo "Creating camera..."
 
@@ -57,7 +65,15 @@ uvicorn app.main:app > restart_test.log 2>&1 &
 API_PID=$!
 cd ..
 
-sleep 3
+echo "Waiting for API to be ready..."
+
+for i in {1..20}; do
+    if curl -s "$API_URL/docs" > /dev/null; then
+        echo "API is ready"
+        break
+    fi
+    sleep 0.5
+done
 
 echo "Checking cameras after restart..."
 

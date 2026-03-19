@@ -1,82 +1,67 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+#include <vector>
 
 #include "smart_parking/Logger.h"
+
+namespace smart_parking {
 
 /**
  * @class Aligner
  * @brief Frame-to-reference image alignment using optical flow.
  *
- * This class compensates for small camera motions by aligning incoming frames
- * to a fixed reference image. It relies on sparse optical flow tracking
- * and affine transformation estimation.
- *
- * The reference image is assumed to be static and representative of the scene.
- * The class maintains internal temporal state (previous frame and features)
- * to ensure stable optical flow tracking over time.
- *
- * Responsibilities:
- *  - Track visual features across frames
- *  - Estimate inter-frame motion
- *  - Warp frames to match the reference coordinate system
- *
- * Non-responsibilities:
- *  - Does NOT decide when alignment is needed
- *  - Does NOT manage frame acquisition
+ * Not thread-safe. One instance per camera must be used.
  */
 class Aligner {
 private:
-    /// Reference image used as alignment target
-    cv::Mat _reference;
+    /// Reference image (immutable)
+    const cv::Mat _reference;
 
-    /// Previous grayscale frame (used for optical flow)
+    /// Previous grayscale frame
     cv::Mat _prevGray;
 
-    /// Feature points tracked in the previous frame
+    /// Previously tracked feature points
     std::vector<cv::Point2f> _prevPts;
 
-    /// Feature points detected in the reference image
+    /// Reference feature points
     std::vector<cv::Point2f> _refPts;
 
-    /// Indicates whether optical flow tracking has been initialized
+    /// Optical flow initialization flag
     bool _flowInitialized = false;
 
+    /// Last estimated affine transform (2x3, CV_64F)
     cv::Mat _lastAffine;
+
+    /// Whether last affine is valid
     bool _affineValid = false;
 
-    /**
-     * @brief Initializes feature points on the reference image.
-     *
-     * Detects stable and well-distributed feature points that will be used
-     * as anchors for optical flow tracking.
-     *
-     * This method must be called before any alignment attempt.
-     */
     void initReference();
 
 public:
     /**
-     * @brief Constructs an Aligner with a given reference image.
-     *
-     * @param reference Reference image defining the target coordinate system.
+     * @brief Construct an Aligner
+     * @param reference Reference image (BGR uint8)
      */
-    Aligner(cv::Mat reference);
+    explicit Aligner(const cv::Mat& reference);
 
     /**
-     * @brief Aligns an input frame to the reference image.
+     * @brief Align frame to reference
      *
-     * Estimates camera motion using optical flow and computes an affine
-     * transformation to warp the frame into the reference coordinate space.
+     * @param frame Input frame (BGR uint8, same size as reference)
+     * @param warped Output aligned frame
      *
-     * @param frame Input frame to align (unchanged).
-     * @param warped Output aligned frame.
-     *
-     * @return True if alignment was successful, false otherwise
-     *         (e.g. insufficient tracked points or unstable estimation).
+     * @return True if alignment succeeded
      */
     bool operator()(const cv::Mat& frame, cv::Mat& warped);
 
-    bool hasAffine() const;
+    bool hasAffine() const noexcept;
+
+    /**
+     * @brief Get last affine transform
+     * @return Copy of the affine matrix
+     */
     cv::Mat getAffine() const;
 };
+
+} // namespace smart_parking

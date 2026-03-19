@@ -2,44 +2,78 @@
 
 #include <iostream>
 #include <string>
+#include <mutex>
 
+namespace smart_parking {
+
+/**
+ * @enum LogLevel
+ * @brief Logging severity levels.
+ */
 enum class LogLevel {
     INFO = 0,
     WARN = 1,
     ERROR = 2
 };
 
+/**
+ * @class Logger
+ * @brief Simple thread-safe logger for console output.
+ *
+ * This logger is designed for lightweight debugging and monitoring.
+ * It is thread-safe and supports runtime log level configuration.
+ */
 class Logger {
 private:
     LogLevel _level;
-public:
+    mutable std::mutex _mutex;
 
-    static Logger& log() {
+    Logger() : _level(LogLevel::INFO) {}
+
+public:
+    /**
+     * @brief Access the global logger instance.
+     */
+    static Logger& instance() {
         static Logger instance;
         return instance;
     }
 
-    // Default constructor: INFO and above
-    Logger() : _level(LogLevel::INFO) {}
+    static Logger& log() {
+        return instance();
+    }
 
-    // Constructor with explicit log level
-    explicit Logger(LogLevel level) : _level(level) {}
+    /**
+     * @brief Set the minimum log level.
+     */
+    void setLevel(LogLevel level) {
+        _level = level;
+    }
+
+    /**
+     * @brief Check if a message should be logged.
+     */
+    bool shouldLog(LogLevel msgLevel) const {
+        return static_cast<int>(msgLevel) >= static_cast<int>(_level);
+    }
 
     void info(const std::string& msg) const {
-        if (_level <= LogLevel::INFO) {
-            std::cout << "[INFO]  " << msg << std::endl;
-        }
+        if (!shouldLog(LogLevel::INFO)) return;
+        std::lock_guard<std::mutex> lock(_mutex);
+        std::cout << "[INFO]  " << msg << "\n";
     }
 
     void warn(const std::string& msg) const {
-        if (_level <= LogLevel::WARN) {
-            std::cout << "[WARN]  " << msg << std::endl;
-        }
+        if (!shouldLog(LogLevel::WARN)) return;
+        std::lock_guard<std::mutex> lock(_mutex);
+        std::cout << "[WARN]  " << msg << "\n";
     }
 
     void error(const std::string& msg) const {
-        if (_level <= LogLevel::ERROR) {
-            std::cerr << "[ERROR] " << msg << std::endl;
-        }
+        if (!shouldLog(LogLevel::ERROR)) return;
+        std::lock_guard<std::mutex> lock(_mutex);
+        std::cerr << "[ERROR] " << msg << "\n";
     }
 };
+
+} // namespace smart_parking

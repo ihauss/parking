@@ -7,144 +7,212 @@
 #include <fstream>
 #include <chrono>
 #include <stdexcept>
+#include <map>
 
 #include "smart_parking/ParkingPlace.h"
 #include "smart_parking/Aligner.h"
-#include "smart_parking/RenderPlace.h"
+#include "smart_parking/RenderSnapshot.h"
 #include "smart_parking/Logger.h"
 #include "smart_parking/Frame.h"
-#include "smart_parking/RenderSnapshot.h"
 #include "smart_parking/CameraState.h"
+
+namespace smart_parking {
 
 /**
  * @class Parking
- * @brief High-level manager for parking occupancy estimation and rendering.
+ * @brief High-level orchestrator for parking occupancy estimation.
  *
- * The Parking class represents a full parking area composed of multiple
- * ParkingPlace instances. It is responsible for:
+ * The Parking class represents a complete parking area composed of multiple
+ * ParkingPlace instances. It is responsible for coordinating the full
+ * perception pipeline:
  *
- *  - loading parking place definitions from a configuration file,
- *  - aligning incoming frames to a reference image,
- *  - updating the occupancy state of each parking place,
- *  - aggregating global statistics (e.g. number of occupied places),
- *  - providing rendering-friendly data for visualization layers.
+ *  - loading parking place geometry from a configuration file,
+ *  - aligning incoming frames to a fixed reference image,
+ *  - updating each parking place (state machine + async estimation),
+ *  - aggregating global statistics (occupancy, FPS, latency),
+ *  - exposing rendering-friendly data structures.
  *
- * This class does NOT perform low-level vision algorithms itself; it
- * orchestrates specialized components (Aligner, ParkingPlace, Renderer).
+ * Design principles:
+ *  - Delegation: low-level vision is handled by dedicated components
+ *    (Aligner, LightVision, HeavyEstimator).
+ *  - Real-time: designed to process frames sequentially at high frequency.
+ *  - Non-blocking: heavy computations are asynchronous at ParkingPlace level.
+ *
+ * This class is the main entry point of the system.
  */
 class Parking {
 private:
+
     /**
      * @brief Number of currently occupied parking places.
      *
-     * This value is recomputed at each evolve() call based on the
-     * state of all ParkingPlace instances.
+     * Recomputed at each call to evolve() based on the state
+     * of all ParkingPlace instances.
      */
     int _numOccupied{0};
 
     /**
-     * @brief Collection of managed parking places.
+     * @brief Collection of parking places managed by the system.
      */
     std::vector<ParkingPlace> _places;
 
     /**
-     * @brief Last observed latency of the full pipeline.
+     * @brief Last measured end-to-end latency (milliseconds).
+     *
+     * Includes alignment + state updates for all parking places.
      */
     double _lastLatencyMs{0.0};
 
     /**
-     * @brief Frame-to-frame alignment helper.
+     * @brief Estimated frames per second.
      *
-     * Used to compensate for camera motion by aligning incoming frames
-     * to a fixed reference image.
+     * Computed from the processing latency or frame timestamps.
+     */
+    double _fps{0.0};
+
+    /**
+     * @brief Frame alignment module.
+     *
+     * Compensates for camera motion by aligning incoming frames
+     * to a reference coordinate system.
      */
     Aligner _aligner;
 
+    /**
+     * @brief Current state of the camera / processing pipeline.
+     *
+     * Used to expose system health (e.g. running, error).
+     */
     CameraState _state{CameraState::IDLE};
 
-public:
     /**
-     * @brief Constructs a Parking manager from a configuration file.
+     * @brief Total number of processed frames.
      *
-     * The constructor:
-     *  - loads parking place geometries from a JSON file,
-     *  - initializes all ParkingPlace instances,
-     *  - stores the reference frame used for alignment.
-     *
-     * @param jsonPath Path to the JSON file describing parking places.
-     * @param reference Reference image used for frame alignment.
+     * Useful for statistics, debugging, and monitoring.
      */
-    Parking(const std::string& jsonPath, cv::Mat reference);
+    size_t _frameCount{0};
+
+public:
+
+    /**
+     * @brief Constructs a Parking manager from configuration.
+     *
+     * This constructor:
+     *  - loads parking place definitions from a JSON file,
+     *  - initializes ParkingPlace instances,
+     *  - initializes the alignment module with a reference frame.
+     *
+     * @param jsonPath Path to JSON file describing parking geometry.
+     * @param reference Reference image used for alignment.
+     *
+     * @throws std::runtime_error if file cannot be read or parsed.
+     */
+    Parking(const std::string& jsonPath, const cv::Mat& reference);
 
     /**
      * @brief Returns the total number of parking places.
      *
-     * @return Total number of managed parking places.
+     * @return Number of configured parking slots.
      */
     size_t getNumPlace() const;
 
     /**
-     * @brief Returns the number of currently occupied parking places.
+     * @brief Returns the number of currently occupied places.
      *
-     * This value reflects the result of the last evolve() call.
+     * Value is updated during the last evolve() call.
      *
-     * @return Number of occupied parking places.
+     * @return Number of occupied parking slots.
      */
     int getNumOccupied() const;
 
     /**
-     * @brief Returns last FPS.
+     * @brief Returns the current FPS estimate.
      *
-     * This value reflects the result of the last evolve() call.
+     * Based on recent processing latency.
      *
-     * @return Current FPS.
+     * @return Frames per second.
      */
     double getFps() const;
 
     /**
-     * @brief Returns last latency measured in ms.
+     * @brief Returns the last measured latency.
      *
-     * This value reflects the result of the last evolve() call.
-     *
-     * @return Last latency of evolve function.
+     * @return Latency in milliseconds.
      */
     double getLastLatencyMs() const;
 
     /**
-     * @brief Return system metrics converted to json 
+     * @brief Returns aggregated system statistics.
      *
-     * This value reflects the result of the last evolve() call.
+     * Includes:
+     *  - FPS,
+     *  - latency,
+     *  - occupancy ratio.
      *
-     * @return Last evaluation of evolve function into a json file.
+     * @return Map of metric name → value.
      */
     std::map<std::string, double> getStats() const;
 
     /**
-     * @brief Updates the state of the parking using a new video frame.
+     * @brief Main update function called for each frame.
      *
-     * The method:
-     *  - aligns the current frame to the reference image,
-     *  - updates each ParkingPlace state,
-     *  - recomputes global occupancy statistics.
+     * This method executes the full pipeline:
      *
-     * @param frame Current video frame.
+     *  1. Validate input frame,
+     *  2. Align frame to reference (if possible),
+     *  3. Update all ParkingPlace instances,
+     *  4. Aggregate global statistics.
+     *
+     * This method must be called sequentially (not thread-safe).
+     *
+     * @param frame Input frame wrapper (validated BGR image).
      */
     void evolve(const Frame& frame);
 
     /**
-     * @brief Returns rendering data for all parking places.
-     *
-     * This method exposes lightweight, rendering-oriented data structures
-     * that can be consumed by visualization layers (OpenCV overlays, UI,
-     * bindings, etc.) without exposing internal logic.
-     *
-     * @return Vector of RenderPlace objects.
+     * @brief Retrieve the minimal information to render a place
      */
     std::vector<RenderPlace> getRenderData() const;
 
-    bool hasAffine() const;
-    std::array<double, 6> getAffine() const;
+    /**
+     * @brief Returns rendering snapshot of the current system state.
+     *
+     * The snapshot includes:
+     *  - parking place geometry and states,
+     *  - affine transform (if available),
+     *  - global statistics (occupancy).
+     *
+     * This is the preferred interface for visualization layers.
+     *
+     * @return RenderSnapshot structure.
+     */
     RenderSnapshot getRenderSnapshot() const;
+
+    /**
+     * @brief Indicates whether a valid affine transform is available.
+     *
+     * @return True if alignment succeeded recently.
+     */
+    bool hasAffine() const;
+
+    /**
+     * @brief Returns the last estimated affine transform.
+     *
+     * The transform is encoded as a 2x3 matrix flattened into
+     * an array of 6 values.
+     *
+     * Must call hasAffine() before using this.
+     *
+     * @return Affine transform coefficients.
+     */
+    std::array<double, 6> getAffine() const;
+
+    /**
+     * @brief Returns current camera/system state.
+     *
+     * @return CameraState enum.
+     */
     CameraState getState() const;
-    std::string getStateString() const;
 };
+
+} // namespace smart_parking
