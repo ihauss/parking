@@ -64,7 +64,7 @@ public:
      * @param frame Frame to draw onto (modified in-place).
      * @param places Parking places rendering descriptors.
      */
-    void draw(cv::Mat& frame, const std::vector<RenderPlace>& places);
+    void draw(cv::Mat& frame, const std::vector<smart_parking::RenderPlace>& places);
 
     /**
      * @brief Adds an informational banner to the frame.
@@ -97,6 +97,6 @@ public:
     void operator()(
         const cv::Mat& frame,
         cv::Mat& output,
-        const RenderSnapshot& snapshot
+        const smart_parking::RenderSnapshot& snapshot
     );
 };

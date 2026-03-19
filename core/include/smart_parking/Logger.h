@@ -28,7 +28,7 @@ private:
     LogLevel _level;
     mutable std::mutex _mutex;
 
-    Logger() : _level(LogLevel::INFO) {}
+    Logger() : _level(LogLevel::WARN) {}
 
 public:
     /**

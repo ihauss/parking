@@ -42,11 +42,11 @@ int main(int argc, char** argv){
     VideoCapture cap;
     VideoWriter writer;
     Mat frame, output;
-    Frame engineFrame(frame);
+    smart_parking::Frame engineFrame(frame);
     Renderer renderer;
 
     // Initialize the parking detection system
-    Parking parking("files/coords.json", imread("files/reference.jpg"));
+    smart_parking::Parking parking("files/coords.json", imread("files/reference.jpg"));
 
     // Create display window
     if (!config.headless)namedWindow("Parking view", WINDOW_NORMAL);
@@ -67,7 +67,7 @@ int main(int argc, char** argv){
         engineFrame.timestamp = std::chrono::steady_clock::now();
         parking.evolve(engineFrame);
 
-        RenderSnapshot snapshot = parking.getRenderSnapshot();
+        smart_parking::RenderSnapshot snapshot = parking.getRenderSnapshot();
 
         renderer(frame, output, snapshot);
         

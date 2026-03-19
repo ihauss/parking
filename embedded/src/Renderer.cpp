@@ -30,14 +30,14 @@ void Renderer::updateFPS(double alpha){
 
     // Instantaneous FPS
      if (dt <= 0.0) {
-        Logger::log().warn("Renderer: non-positive delta time for FPS computation");
+        smart_parking::Logger::log().warn("Renderer: non-positive delta time for FPS computation");
         return;
     }
     double currentFps = 1.0 / dt;
 
     // Exponential moving average for smoother FPS display
     if (alpha <= 0.0 || alpha > 1.0) {
-    Logger::log().warn("Renderer: invalid alpha for FPS EMA, using default 0.1");
+    smart_parking::Logger::log().warn("Renderer: invalid alpha for FPS EMA, using default 0.1");
         alpha = 0.1;
     }
     _fps = (_fps == 0.0)
@@ -51,9 +51,9 @@ double Renderer::getFps() const {
 }
 
 //Draw parking places on the frame.
-void Renderer::draw(cv::Mat& frame, const std::vector<RenderPlace>& places){
+void Renderer::draw(cv::Mat& frame, const std::vector<smart_parking::RenderPlace>& places){
     if (frame.empty()) {
-        Logger::log().error("Renderer::draw called with empty frame");
+        smart_parking::Logger::log().error("Renderer::draw called with empty frame");
         return;
     }
 
@@ -63,7 +63,7 @@ void Renderer::draw(cv::Mat& frame, const std::vector<RenderPlace>& places){
 
     for (const auto& p : places) {
         if (p.coords.size() < 3) {
-            Logger::log().warn("Renderer: place with insufficient polygon points");
+            smart_parking::Logger::log().warn("Renderer: place with insufficient polygon points");
             continue;
         }
 
@@ -73,7 +73,7 @@ void Renderer::draw(cv::Mat& frame, const std::vector<RenderPlace>& places){
         // Select color according to parking state
         int idx = static_cast<int>(p.state);
         if (idx < 0 || idx >= static_cast<int>(COLORS.size())) {
-            Logger::log().warn("Renderer: invalid PlaceState encountered");
+            smart_parking::Logger::log().warn("Renderer: invalid PlaceState encountered");
             continue;
         }
         cv::Scalar color = COLORS[idx];
@@ -97,13 +97,13 @@ void Renderer::addBanner(
     int numPlace
 ){
     if (frame.empty()) {
-        Logger::log().error("Renderer::addBanner called with empty frame");
+        smart_parking::Logger::log().error("Renderer::addBanner called with empty frame");
         output = frame;
         return;
     }
 
     if (numOccupied > numPlace || numOccupied < 0 || numPlace <= 0) {
-        Logger::log().warn(
+        smart_parking::Logger::log().warn(
             "Renderer: inconsistent parking stats (occupied=" +
             std::to_string(numOccupied) + ", total=" +
             std::to_string(numPlace) + ")"
@@ -111,7 +111,7 @@ void Renderer::addBanner(
     }
 
     if (_fps <= 0.0) {
-        Logger::log().warn("Renderer: FPS not initialized yet");
+        smart_parking::Logger::log().warn("Renderer: FPS not initialized yet");
     }
 
     int W = frame.cols;
@@ -174,10 +174,10 @@ void Renderer::addBanner(
 void Renderer::operator()(
     const cv::Mat& frame,
     cv::Mat& output,
-    const RenderSnapshot& snapshot
+    const smart_parking::RenderSnapshot& snapshot
 ){
     if (frame.empty()) {
-        Logger::log().error("Renderer::operator() called with empty frame");
+        smart_parking::Logger::log().error("Renderer::operator() called with empty frame");
         return;
     }
 
