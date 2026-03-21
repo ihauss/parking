@@ -25,7 +25,6 @@ RUN cmake -S . -B build_api \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_API=ON \
     -DBUILD_EMBEDDED=OFF \
-    -DBUILD_TESTS=OFF \
  && cmake --build build_api -j$(nproc)
 
  # =========================

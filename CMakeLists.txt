@@ -24,9 +24,3 @@ endif()
 if (BUILD_API)
     add_subdirectory(bindings)
 endif()
-
-# tests seulement en dev
-option(BUILD_TESTS "Build tests" OFF)
-if (BUILD_TESTS)
-    add_subdirectory(tests)
-endif()

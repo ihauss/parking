@@ -88,8 +88,8 @@ fi
 echo "Camera successfully reloaded after restart"
 
 echo "Cleaning..."
+curl -s -X DELETE "$API_URL/system/cameras/$CAM_ID"
 kill -9 $API_PID
-rm -rf $DATA_DIR/$CAM_ID
 
 echo "------------------------------------"
 echo "Restart Test PASSED"

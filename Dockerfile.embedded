@@ -24,7 +24,6 @@ COPY . .
 RUN cmake -S . -B build_embedded \
     -DBUILD_API=OFF \
     -DBUILD_EMBEDDED=ON \
-    -DBUILD_TESTS=OFF \
  && cmake --build build_embedded -j$(nproc)
 
 # =========================
