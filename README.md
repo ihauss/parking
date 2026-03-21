@@ -1,140 +1,324 @@
-# Smart Parking
+# Smart Parking — Multi-Camera Vision System
 
-### A constrained computer vision system for parking occupancy estimation
-
-## 1. Problem Statement
-Monitoring parking occupancy seems trivial when high-resolution cameras, stable viewpoints and GPU-powered inference are available.
-
-In practice, many real-world deployments rely on low-cost hardware, fixed overhead cameras subject to slight motion, and limited computational resources.
-
-The challenge addressed in this project is to reliably estimate parking occupancy from a semi-stable top-down view, under strict compute constraints (CPU-only, no GPU), while maintaining robustness to illumination changes and minor camera displacement.
-
-## Status
-
-V-1.1.0 complete – Core system stabilized
-API production-ready
-Deterministic state management
-Dockerized deployment validated
-
-## 2. Deployment
-
-### API
-docker build -t smart-parking-api --target api .
-docker run -p 8000:8000 smart-parking-api
-
-### Embedded
-docker build -t smart-parking-embedded --target embedded .
-docker run smart-parking-embedded
-
-## 3. Design Philosophy & Constraints
-
-### CPU-Only by Design
-
-The system targets CPU-only execution to ensure low deployment cost, portability, and energy efficiency. 
-
-Given the constrained top-down viewpoint and limited classification space (occupied vs. free), a carefully engineered vision pipeline provides sufficient reliability without GPU acceleration.
-
-While this limits multi-camera scalability on a single device, it enforces computational discipline and edge compatibility from the ground up.
-
-## 4. System Overview
-
-<p align="center">
-  <img src="docs/system_overview.png" width="750">
-</p>
+### Real-time, CPU-efficient, stateful parking occupancy detection
 
 ---
-
-The system operates as a hierarchical evaluation pipeline designed for constrained environments.
-
-An input image first passes through the **Image Processing** stage, where visual features relevant to parking occupancy are extracted. This layer focuses strictly on perception and remains independent from higher-level business logic.
-
-The processed observations are then forwarded to the **Spot-Level Evaluation** layer. At this level, each parking space maintains its own evolving state, enabling temporal consistency and stable occupancy estimation even under illumination changes or minor camera displacement.
-
-The **Parking-Level Aggregation** stage consolidates individual spot states into a coherent global representation of the parking area. This layer acts as the central orchestrator, exposing unified outputs to the external API.
-
-Depending on the use case, the system provides:
-
-- Operational metrics  
-- Rendering information for visualization  
-- Business-level occupancy data  
-
-This multi-level structure ensures a clear separation between perception, local state evolution, and global aggregation while remaining lightweight and edge-compatible.
-
-## 5. High-Level Architecture
-
-## 6. Demo & Visualization
 
 <p align="center">
   <img src="docs/demo.gif" width="800">
 </p>
 
-## 7. Performance Summary
+---
 
-**FPS** : 12 to 14
+## Overview
 
-**Résolution** : 1080p
+**Smart Parking** is a production-oriented computer vision system designed to estimate parking occupancy in **constrained environments** using **CPU-only inference**.
 
-**CPU** :
+Unlike typical deep-learning-heavy approaches, this system focuses on:
 
-- Architecture: aarch64
-- CPU(s): 8
-- type: ARM
-- Cortex-A55: 1.23 GHz to 2.31 GHz (x6)
-- Cortex-A78: 2.4 GHz to 3.3 GHz (x2)
+* deterministic behavior
+* low resource consumption
+* robustness to real-world conditions
 
-**inference** latency : (future)
-
-**RAM** : 6GB
-
-## 8. Limitations
-
-The system is designed under specific operational assumptions and constraints.
-
-### Camera Assumptions
-
-- Semi-stable, fixed top-down viewpoint  
-- Limited perspective distortion  
-- Moderate and gradual illumination changes  
-- No extreme weather or heavy occlusion conditions  
-
-Significant camera displacement or drastic viewpoint changes may require recalibration.
+It is built as a **multi-camera, stateful API** capable of handling concurrent video streams while maintaining **persistent system state** and **fault isolation**.
 
 ---
 
-### Unhandled Scenarios
+## Key Features
 
-- Severe occlusions (large vehicles overlapping multiple spots)  
-- Rapid lighting transitions (e.g., strong reflections, headlights at night)  
-- Highly dynamic environments with frequent camera movement  
-- Non-standard parking layouts without predefined spot definitions  
+* **Multi-camera support** (concurrent processing)
+* **Real-time inference on CPU-only hardware**
+* **Stateful architecture** with persistent recovery
+* **Automatic reload after restart**
+* **Per-camera isolation (fault tolerant)**
+* **Live metrics (FPS, latency, occupancy)**
+* **Fully Dockerized deployment**
+* **Stress-tested & production-ready API**
 
 ---
 
-### Architectural Trade-offs
+## Architecture
 
-- CPU-only execution limits the number of simultaneous camera streams per device  
-- Prioritizing robustness over peak frame-level accuracy may introduce small, stable estimation bias  
-- Manual configuration is currently required for parking layout definition  
+The system is structured as a modular, layered pipeline:
 
-These trade-offs are intentional to preserve computational efficiency, deterministic behavior, and architectural clarity.
+```
+API Layer
+   ↓
+Camera Manager (multi-cam orchestration)
+   ↓
+C++ Binding (performance-critical layer)
+   ↓
+Vision Engine (image processing & inference)
+   ↓
+Spot-Level State Tracking
+   ↓
+Parking-Level Aggregation
+```
 
-## 9. Roadmap / Future Work
+### Design Principles
 
-### V-1.2.0 – Robustness & Multi-Camera Foundations
+* **Separation of concerns** (API / Engine / Native layer)
+* **Deterministic state management**
+* **Failure isolation per camera**
+* **Edge deployment compatibility**
 
-- Crash recovery validation and restart testing  
-- Strengthened state persistence guarantees  
-- Introduction of a `CameraWorker` abstraction  
-- Multi-camera orchestration layer  
-- Clearer separation between API and embedded runtime  
+---
 
-### Upcoming Extensions
+## System Pipeline
 
-- Automatic camera calibration  
-- Improved temporal tracking  
-- Extended Python bindings  
-- Optional cloud-based monitoring integration  
+<p align="center">
+  <img src="docs/system_overview.png" width="750">
+</p>
 
-## 10. Repository Structure
+The processing pipeline is divided into three main stages:
 
-## 11. Conclusion
+### 1. Image Processing
+
+Extracts relevant visual features from raw frames under constrained conditions.
+
+### 2. Spot-Level Evaluation
+
+Each parking spot maintains its own evolving state, ensuring:
+
+* temporal consistency
+* robustness to lighting changes
+* stability under minor camera motion
+
+### 3. Parking Aggregation
+
+Aggregates all spot states into a global parking occupancy model and exposes:
+
+* occupancy metrics
+* visualization data
+* API outputs
+
+---
+
+## API Capabilities
+
+The API is organized into three main domains:
+
+* **Parking Processing** (`/parking`)
+* **Metrics & Monitoring** (`/metrics`)
+* **System Management** (`/system`)
+
+---
+
+### Parking Endpoints
+
+* `GET /parking/{camera_id}/snapshot` → Retrieve latest processed frame
+* `GET /parking/{camera_id}/stats` → Get parking occupancy statistics
+* `POST /parking/{camera_id}/frame` → Send frame for processing
+
+---
+
+### Metrics Endpoints
+
+* `GET /metrics/{camera_id}` → Per-camera metrics (FPS, latency, occupancy)
+* `GET /metrics/` → Global system metrics
+
+---
+
+### System Endpoints
+
+* `GET /system/cameras` → List all cameras
+
+* `POST /system/cameras` → Add a new camera
+
+* `DELETE /system/cameras/{camera_id}` → Remove a camera
+
+* `POST /system/cameras/{camera_id}/restart` → Restart a camera worker
+
+* `GET /system/cameras/{camera_id}/health` → Camera health status
+
+* `GET /system/cameras/{camera_id}/state` → Internal camera state
+
+---
+
+### Design Rationale
+
+The API separates concerns into three layers:
+
+* **Parking** → business-level vision processing
+* **Metrics** → observability and performance monitoring
+* **System** → lifecycle and orchestration of cameras
+
+This structure ensures clarity between **vision logic**, **system control**, and **monitoring**, while remaining easy to extend.
+
+### Metrics Exposed
+
+* FPS per camera
+* Processing latency
+* Occupied spots
+* Total spots
+
+---
+
+## State Persistence
+
+The system maintains a **fully persistent state**, including:
+
+* Camera configurations (JSON)
+* Reference images
+* Spot definitions
+
+### Guarantees
+
+* Full system recovery after restart
+* No data loss with Docker volumes
+* Deterministic state reconstruction
+
+---
+
+## Deployment
+
+### API
+
+```bash
+docker build -f Dockerfile.api -t smart-parking-api .
+docker run -p 8000:8000 -v $(pwd)/data:/app/data smart-parking-api
+```
+
+### Embedded Runtime
+
+```bash
+docker build -f Dockerfile.embedded -t smart-parking-embedded .
+docker run --rm smart-parking-embedded
+```
+
+---
+
+## Robustness & Testing
+
+The system has been validated through:
+
+* Multi-camera stress tests
+* Invalid input handling (images / JSON)
+* Crash recovery scenarios
+* High-frequency frame ingestion
+* Camera failure isolation
+
+A failing camera **never impacts other streams**.
+
+---
+
+## Performance
+
+**Resolution**: 1080p
+**FPS**: 12–14 (CPU-only)
+
+**Hardware**:
+
+* ARM aarch64
+* Cortex-A55 / Cortex-A78
+* 6GB RAM
+
+The system is optimized for **edge devices** and low-power environments.
+
+---
+
+## Limitations
+
+### Operational Assumptions
+
+* Semi-fixed top-down camera
+* Limited perspective distortion
+* Moderate lighting variations
+
+### Known Limitations
+
+* Severe occlusions
+* Extreme lighting changes
+* Dynamic camera movement
+* Manual parking configuration required
+
+### Trade-offs
+
+* CPU-only limits per-device scalability
+* Stability prioritized over peak accuracy
+
+---
+
+## Use Cases
+
+* Smart parking systems
+* Industrial site monitoring
+* Low-cost edge deployments
+* Embedded vision systems
+
+---
+
+## Roadmap
+
+### Next Iterations
+
+* Automatic camera calibration
+* Improved temporal tracking
+* Enhanced multi-camera scaling
+* Cloud monitoring integration
+
+---
+
+## Repository Structure
+
+```
+api/                → FastAPI application (routes & HTTP layer)
+core/               → Business logic & state management
+bindings/           → C++ bindings (performance-critical components)
+embedded/           → Embedded runtime configuration
+
+docs/               → Documentation assets (images, diagrams)
+scripts/            → Utility scripts
+
+Dockerfile.api      → API container
+Dockerfile.embedded → Embedded runtime container
+CMakeLists.txt      → Native build configuration
+```
+
+---
+
+### Architectural Breakdown
+
+* **api/**
+  Handles all HTTP interactions and exposes the public interface.
+
+* **core/**
+  Contains the main domain logic:
+
+  * parking state management
+  * camera orchestration
+  * aggregation logic
+
+* **bindings/**
+  Bridges Python and C++ for performance-critical operations.
+
+* **embedded/**
+  Dedicated environment for constrained or edge deployments.
+
+---
+
+This separation enforces a clean architecture between:
+
+* interface (API)
+* domain logic (core)
+* performance layer (C++)
+
+---
+
+## Conclusion
+
+This project demonstrates how a **carefully engineered vision pipeline** can outperform heavier approaches in constrained environments.
+
+It highlights strong capabilities in:
+
+* real-time computer vision
+* backend system design
+* multi-camera orchestration
+* production-grade robustness
+
+---
+
+**Positioning**:
+Real-time Vision Engineer
+Backend Engineer for AI Systems
+Edge AI / Embedded Vision Developer

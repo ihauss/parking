@@ -192,7 +192,7 @@ void Renderer::operator()(
         frame.copyTo(output);
     }
 
-    // --- 2️⃣ Apply affine alignment if available ---
+    // --- Apply affine alignment if available ---
     if (snapshot.hasAffine) {
         cv::Mat affineMat(2, 3, CV_64F,
                           const_cast<double*>(snapshot.affine.data()));

@@ -1,6 +1,7 @@
 # Build artifacts
 build/
 cmake-build-*/
+build*
 
 # CMake cache
 CMakeCache.txt
@@ -13,3 +14,8 @@ CMakeFiles/
 # Git
 .git/
 .gitignore
+
+__pycache__
+*.pyc
+*.log
+data/cameras

@@ -28,14 +28,7 @@ RUN cmake -S . -B build_api \
     -DBUILD_TESTS=OFF \
  && cmake --build build_api -j$(nproc)
 
-# ---------- EMBEDDED BUILD ----------
-RUN cmake -S . -B build_embedded \
-    -DBUILD_API=OFF \
-    -DBUILD_EMBEDDED=ON \
-    -DBUILD_TESTS=OFF \
- && cmake --build build_embedded -j$(nproc)
-
-# =========================
+ # =========================
 # API Runtime
 # =========================
 FROM builder AS api
@@ -71,22 +64,3 @@ ENV PYTHONPATH=/app
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-# =========================
-# Embedded Runtime
-# =========================
-FROM builder AS embedded
-
-RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Data files
-COPY files ./files
-
-COPY --from=builder /build/build_embedded/embedded/smart_parking_embedded .
-
-CMD ["./smart_parking_embedded", "--headless"]
