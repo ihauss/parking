@@ -108,7 +108,7 @@ class CameraWatchdog:
                 elif state == "RUNNING" and last_frame_age > self.timeout:
                     need_restart = True
 
-                elif latency_ms > 500 and last_frame_age > 1:
+                elif state == "RUNNING" and latency_ms > 500 and last_frame_age > 1:
                     need_restart = True
 
                 # =========================
